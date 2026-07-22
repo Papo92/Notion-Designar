@@ -188,24 +188,23 @@ class NotionKanbanApp {
     }
 
     if (this.darkModeBtnEl) {
+      const updateIcon = () => {
+        const isDark = document.body.classList.contains('dark-mode');
+        this.darkModeBtnEl.innerHTML = isDark ? '☀️ <span class="dark-mode-label" style="font-size:11px; font-weight:600;">Claro</span>' : '🌙 <span class="dark-mode-label" style="font-size:11px; font-weight:600;">Oscuro</span>';
+        this.darkModeBtnEl.title = isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro';
+      };
+
       this.darkModeBtnEl.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
         const isDark = document.body.classList.contains('dark-mode');
         localStorage.setItem('notion_dark_mode', isDark ? 'true' : 'false');
+        updateIcon();
       });
-    }
 
-    if (this.resetCacheBtnEl) {
-      this.resetCacheBtnEl.addEventListener('click', () => {
-        if (confirm('¿Restablecer el tablero con las tarjetas oficiales de Notion?')) {
-          odooClient.resetDemo();
-          location.reload(true);
-        }
-      });
-    }
-
-    if (localStorage.getItem('notion_dark_mode') === 'true') {
-      document.body.classList.add('dark-mode');
+      if (localStorage.getItem('notion_dark_mode') === 'true') {
+        document.body.classList.add('dark-mode');
+      }
+      updateIcon();
     }
 
     if (this.odooConfigBtnEl) this.odooConfigBtnEl.addEventListener('click', () => this.openConfigModal());

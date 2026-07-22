@@ -1290,6 +1290,21 @@ body {
     min-height: 80px;
   }
 
+  /* Dark Mode Toggle Button Styling on Mobile */
+  #dark-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-strong);
+    color: var(--text-main);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
   /* Toast Notification positioning on mobile */
   .undo-toast-container {
     bottom: 12px;
@@ -1302,3 +1317,4 @@ body {
     width: 100%;
   }
 }
+
