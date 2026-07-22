@@ -15,7 +15,7 @@
     // bypass disk cache. Instead we redirect to a new URL with a unique
     // timestamp parameter — a URL Brave has never seen = always fresh.
     // ============================================================
-    var KANBAN_VERSION = '3.9.0';
+    var KANBAN_VERSION = '4.0.0';
     var storedVersion = sessionStorage.getItem('__kanban_v');
     var params = new URLSearchParams(window.location.search);
     var hasBust = params.has('_v');
@@ -49,7 +49,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=3.9.0">
+  <link rel="stylesheet" href="css/styles.css?v=4.0.0">
 </head>
 <body>
 
@@ -185,6 +185,6 @@
   </div>
 
   <!-- JavaScript Entrypoint -->
-  <script type="module" src="js/app.js?v=3.9.0"></script>
+  <script type="module" src="js/app.js?v=4.0.0"></script>
 </body>
 </html>

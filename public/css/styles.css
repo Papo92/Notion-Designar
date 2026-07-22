@@ -1038,3 +1038,99 @@ body {
   border-color: #10b981;
 }
 
+/* ============================================================
+   📱 Mobile Responsiveness & Anti-Overlap Media Queries
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Header & Navigation Bar Anti-Overlap */
+  .header {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .brand-section {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  .view-switcher, .partner-filter {
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #project-select {
+    flex: 1;
+    font-size: 13px;
+    max-width: 180px;
+  }
+
+  /* Kanban Board Touch Scrolling & Column Sizing */
+  .kanban-board {
+    padding: 10px;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+
+  .kanban-column {
+    min-width: 82vw;
+    max-width: 85vw;
+    scroll-snap-align: center;
+  }
+
+  /* Always show edit pencil icon on mobile (no hover state on touch) */
+  .edit-title-icon {
+    opacity: 0.85 !important;
+  }
+
+  /* Modal Anti-Overlap & Touch Optimization */
+  .modal-card {
+    width: 95vw;
+    max-width: 95vw;
+    padding: 14px;
+    margin: 6px auto;
+    max-height: 93vh;
+    border-radius: 12px;
+  }
+
+  /* Stack 3-column modal grids vertically on small screens */
+  .modal-card div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Stack Sub-Kanban columns vertically on mobile for clean touch interaction */
+  .sub-kanban-board {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .sub-kanban-col {
+    min-height: 80px;
+  }
+
+  /* Tables & Gallery Responsive */
+  .notion-table-view {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .notion-gallery-view {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+}
+
+
