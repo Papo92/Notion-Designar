@@ -1157,7 +1157,26 @@ class NotionKanbanApp {
         </div>
       </div>
 
-      <div class="form-group">
+      <!-- Notion Interactive Block Content Builder -->
+      <div class="notion-block-container">
+        <div class="sub-kanban-title" style="margin-bottom: 4px;">
+          <span>🧩 Bloques de Contenido Estilo Notion</span>
+          <span style="font-weight:normal; font-size:11px;">Agrega notas, cuadrículas, carruseles y alertas</span>
+        </div>
+
+        <div class="notion-builder-toolbar">
+          <button type="button" class="btn btn-sm add-block-btn" data-type="callout" style="font-size:11px;">💡 + Callout Destacado</button>
+          <button type="button" class="btn btn-sm add-block-btn" data-type="table" style="font-size:11px;">📊 + Cuadrícula / Tabla</button>
+          <button type="button" class="btn btn-sm add-block-btn" data-type="carousel" style="font-size:11px;">🎠 + Carrusel de Imágenes</button>
+          <button type="button" class="btn btn-sm add-block-btn" data-type="note" style="font-size:11px;">📝 + Nota de Texto</button>
+        </div>
+
+        <div id="notion-blocks-list" style="display:flex; flex-direction:column; gap:10px;">
+          ${renderTaskBlocks(task.blocks)}
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:10px;">
         <label>Contenido / Minuta de la Bitácora</label>
         <textarea id="detail-task-desc" class="form-control" rows="5" style="resize: vertical; font-family: monospace; font-size: 12px;">${task.description || ''}</textarea>
       </div>
@@ -1468,6 +1487,132 @@ class NotionKanbanApp {
         this.renderCurrentView();
       });
     }
+
+    // Notion Block Builder Handlers
+    this.detailModalBodyEl.querySelectorAll('.add-block-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        if (type === 'callout') {
+          task.blocks.push({ id: Date.now(), type: 'callout', icon: '💡', title: 'IMPORTANTE / NOTA', text: '', color: 'yellow' });
+        } else if (type === 'table') {
+          task.blocks.push({
+            id: Date.now(),
+            type: 'table',
+            title: 'Tabla de Métricas',
+            rows: [
+              ['Métrica 1', '100', '100', '150'],
+              ['Métrica 2', '$10k', '$10k', '$15k']
+            ]
+          });
+        } else if (type === 'carousel') {
+          task.blocks.push({ id: Date.now(), type: 'carousel' });
+        } else if (type === 'note') {
+          task.blocks.push({ id: Date.now(), type: 'note', title: 'Nota de Trabajo', text: '' });
+        }
+        odooClient.persistDemo();
+        this.openDetailModal(task);
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.delete-block-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const blockId = Number(e.target.dataset.blockId);
+        task.blocks = task.blocks.filter(b => Number(b.id) !== blockId);
+        odooClient.persistDemo();
+        this.openDetailModal(task);
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.move-block-up').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = Number(e.target.dataset.idx);
+        if (idx > 0) {
+          const temp = task.blocks[idx];
+          task.blocks[idx] = task.blocks[idx - 1];
+          task.blocks[idx - 1] = temp;
+          odooClient.persistDemo();
+          this.openDetailModal(task);
+        }
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.move-block-down').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = Number(e.target.dataset.idx);
+        if (idx < task.blocks.length - 1) {
+          const temp = task.blocks[idx];
+          task.blocks[idx] = task.blocks[idx + 1];
+          task.blocks[idx + 1] = temp;
+          odooClient.persistDemo();
+          this.openDetailModal(task);
+        }
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.add-table-row-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const blockId = Number(e.target.dataset.blockId);
+        const blk = task.blocks.find(b => Number(b.id) === blockId);
+        if (blk) {
+          if (!Array.isArray(blk.rows)) blk.rows = [];
+          blk.rows.push(['', '', '', '']);
+          odooClient.persistDemo();
+          this.openDetailModal(task);
+        }
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.block-callout-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        if (blk) blk.title = e.target.value;
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.block-callout-text').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        if (blk) blk.text = e.target.value;
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.block-table-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        if (blk) blk.title = e.target.value;
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.grid-cell-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        const rIdx = Number(e.target.dataset.row);
+        const cIdx = Number(e.target.dataset.col);
+        if (blk && blk.rows && blk.rows[rIdx]) {
+          blk.rows[rIdx][cIdx] = e.target.value;
+        }
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.block-note-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        if (blk) blk.title = e.target.value;
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.block-note-content').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+        if (blk) blk.text = e.target.value;
+      });
+      input.addEventListener('change', () => odooClient.persistDemo());
+    });
 
     this.detailModalEl.classList.add('active');
   }

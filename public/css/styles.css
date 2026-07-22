@@ -1312,9 +1312,101 @@ body {
     right: 12px;
   }
 
-  .undo-toast {
-    justify-content: space-between;
-    width: 100%;
-  }
+/* Notion Block Content Builder */
+.notion-block-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  background-color: var(--bg-sidebar);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  border: 1px solid var(--border-light);
 }
+
+.notion-builder-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.notion-block-card {
+  position: relative;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.notion-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Callout Block Styling */
+.notion-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background-color: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.notion-callout-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Notion Grid Table Block Styling */
+.notion-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.notion-grid-table th, .notion-grid-table td {
+  border: 1px solid var(--border-light);
+  padding: 6px 10px;
+}
+
+.notion-grid-table th {
+  background-color: var(--bg-sidebar);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Carousel Slider Block */
+.notion-carousel-slider {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.carousel-slide-item {
+  width: 160px;
+  min-width: 160px;
+  height: 110px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--border-light);
+}
+
 
