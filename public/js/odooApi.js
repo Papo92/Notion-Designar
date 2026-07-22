@@ -1,7 +1,7 @@
 import { initialMockStages, initialMockTasks } from './mockData.js';
 
 // ⬆️ Bump this whenever mockData.js changes to force a localStorage reset
-const DATA_VERSION = 'notion-v7-ventas-juntas';
+const DATA_VERSION = 'notion-v8-ventas-force-reset';
 
 class OdooApiClient {
   constructor() {
@@ -31,8 +31,9 @@ class OdooApiClient {
 
     const hasDesignarCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'designar' || t.name === 'Mercado Libre');
     const hasPenseEnTiCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'pense_en_ti' || t.name === 'Inventario de la tienda');
+    const hasVentasCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'ventas');
 
-    if (storedVersion !== DATA_VERSION || !hasDesignarCards || !hasPenseEnTiCards) {
+    if (storedVersion !== DATA_VERSION || !hasDesignarCards || !hasPenseEnTiCards || !hasVentasCards) {
       console.log(`⚡ Resetting cache to fresh Notion tasks (version: ${DATA_VERSION})...`);
       this.demoTasks = JSON.parse(JSON.stringify(initialMockTasks));
       localStorage.setItem('notion_data_version', DATA_VERSION);
