@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  odoo-notion-kanban:
+    build: .
+    container_name: odoo-notion-kanban
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./public:/app/public
+      - ./server.js:/app/server.js
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kanban.rule=Host(`kanban.designar.cc`)"
+      - "traefik.http.routers.kanban.entrypoints=http,https"
+      - "traefik.http.routers.kanban.tls=true"
+      - "traefik.http.routers.kanban.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kanban.loadbalancer.server.port=3000"
+
+networks:
+  coolify:
+    external: true

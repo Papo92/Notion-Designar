@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Tablero Notion Kanban - Designar & Socios</title>
+
+  <script>
+    // ============================================================
+    // BRAVE / CHROME CACHE BUSTER — URL-based cache bypass
+    // location.reload(true) is DEPRECATED in Brave/Chrome and does NOT
+    // bypass disk cache. Instead we redirect to a new URL with a unique
+    // timestamp parameter — a URL Brave has never seen = always fresh.
+    // ============================================================
+    var KANBAN_VERSION = '3.8.0';
+    var storedVersion = sessionStorage.getItem('__kanban_v');
+    var params = new URLSearchParams(window.location.search);
+    var hasBust = params.has('_v');
+
+    if (!hasBust && storedVersion && storedVersion !== KANBAN_VERSION) {
+      // Version changed — redirect to fresh URL Brave has never cached
+      sessionStorage.setItem('__kanban_v', KANBAN_VERSION);
+      window.location.replace(window.location.pathname + '?_v=' + KANBAN_VERSION + '.' + Date.now());
+    } else {
+      sessionStorage.setItem('__kanban_v', KANBAN_VERSION);
+      // Clean URL: remove _v param after loading fresh
+      if (hasBust && window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+
+    // Purge Service Workers and Cache Storage (Brave shields)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var r of regs) r.unregister();
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(keys) {
+        for (var k of keys) caches.delete(k);
+      });
+    }
+  </script>
+
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=3.8.0">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header Navbar -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-icon">🤝</div>
+        <div class="brand-title-group">
+          <!-- Project Switcher Select -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <select id="project-select" class="form-control" style="font-weight: 700; font-size: 15px; background-color: var(--bg-subtle); border-color: var(--border-strong); cursor: pointer; padding: 4px 8px;">
+              <option value="designar">🎨 Designar Souvenirs</option>
+              <option value="pense_en_ti">🎁 Expansión PD: Pensé en ti</option>
+            </select>
+          </div>
+          <div id="status-badge" class="status-badge demo">
+            <span class="status-dot"></span>
+            <span id="status-text">Cargando...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Search filter -->
+        <div class="search-input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="search-input" class="search-input" placeholder="Buscar tareas..." />
+        </div>
+
+        <!-- Dark Mode toggle -->
+        <button id="dark-mode-toggle" class="btn btn-icon" title="Cambiar Tema (Oscuro/Claro)">
+          🌙
+        </button>
+
+        <!-- New Task Global Button -->
+        <button id="new-card-btn" class="btn btn-primary">
+          + Nueva Tarea
+        </button>
+      </div>
+    </header>
+
+    <!-- Notion Views Tabs Bar -->
+    <div class="notion-views-bar">
+      <div class="views-tabs">
+        <button class="view-tab active" data-view="board">📋 Estado (Kanban)</button>
+        <button class="view-tab" data-view="table">📊 Tabla (Notion DB)</button>
+        <button class="view-tab" data-view="gallery">🖼️ Galería Visual</button>
+      </div>
+    </div>
+
+    <!-- Partner Filter Bar -->
+    <nav class="partner-filter-bar">
+      <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-right: 6px;">Filtrar Socio:</span>
+      <button class="partner-btn active" data-filter="all">🌐 Todos los Proyectos</button>
+      <button class="partner-btn" data-filter="abelardo">👨‍💻 Abelardo Navarrete</button>
+      <button class="partner-btn" data-filter="regina">👩‍💼 Regina Manjarrez Martin</button>
+      <button class="partner-btn" data-filter="both">👥 Proyectos Conjuntos</button>
+      <button class="partner-btn" data-filter="urgent">🚨 Atrasados / Urgentes</button>
+    </nav>
+
+    <!-- Main Kanban Workspace -->
+    <main class="kanban-workspace">
+      <div id="kanban-board" class="kanban-board">
+        <!-- Columns will be rendered dynamically -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Odoo Credentials & API Config Modal -->
+  <div id="config-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>⚡ Conectar con la API de Odoo</h2>
+        <button id="close-config" class="icon-btn-subtle">&times;</button>
+      </div>
+      
+      <form id="config-form" style="display: flex; flex-direction: column; gap: 14px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer;">
+          <input type="checkbox" id="demo-mode-checkbox" checked />
+          Usar Modo Socios (Regina & Abelardo)
+        </label>
+
+        <div id="odoo-fields" style="display: none; flex-direction: column; gap: 12px;">
+          <div class="form-group">
+            <label>URL de Instancia Odoo</label>
+            <input type="url" id="odoo-url" class="form-control" placeholder="https://mi-empresa.odoo.com" />
+          </div>
+
+          <div class="form-group">
+            <label>Nombre de Base de Datos (DB)</label>
+            <input type="text" id="odoo-db" class="form-control" placeholder="mi-empresa-db" />
+          </div>
+
+          <div class="form-group">
+            <label>Usuario / Email Odoo</label>
+            <input type="text" id="odoo-user" class="form-control" placeholder="admin@empresa.com" />
+          </div>
+
+          <div class="form-group">
+            <label>Contraseña o API Key</label>
+            <input type="password" id="odoo-pass" class="form-control" placeholder="••••••••••••" />
+          </div>
+
+          <div class="form-group">
+            <label>Modelo Odoo a Visualizar</label>
+            <select id="odoo-model" class="form-control">
+              <option value="project.task">project.task (Tareas de Proyectos)</option>
+              <option value="crm.lead">crm.lead (Oportunidades CRM)</option>
+              <option value="helpdesk.ticket">helpdesk.ticket (Tickets Mesa de Ayuda)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button type="submit" class="btn btn-primary">Guardar y Sincronizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Card Detail Modal -->
+  <div id="detail-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Detalles de la Tarea / Proyecto</h2>
+        <button id="close-detail" class="icon-btn-subtle">&times;</button>
+      </div>
+      <div id="detail-modal-body">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Entrypoint -->
+  <script type="module" src="js/app.js?v=3.8.0"></script>
+</body>
+</html>

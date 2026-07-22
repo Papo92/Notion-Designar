@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+id_ed25519*
+.env
+scratch/

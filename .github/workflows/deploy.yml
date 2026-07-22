@@ -1,0 +1,35 @@
+name: 🚀 Auto Deploy to Hetzner VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Production (kanban.designar.cc)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Deploy via SSH to Hetzner VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 5.161.202.40
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /opt/odoo-notion-kanban
+            cd /opt/odoo-notion-kanban
+            if [ -d ".git" ]; then
+              git pull origin main
+            fi
+            docker restart odoo-notion-kanban
+            echo "🚀 Despliegue automático completado con éxito."
+
+      - name: 🌐 Coolify Webhook Trigger (Opcional)
+        if: ${{ secrets.COOLIFY_WEBHOOK != '' }}
+        run: |
+          curl -X POST "${{ secrets.COOLIFY_WEBHOOK }}"
