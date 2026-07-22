@@ -981,6 +981,121 @@ class NotionKanbanApp {
       </div>
     `).join('') : '';
 
+    if (!Array.isArray(task.blocks)) task.blocks = [];
+
+    const renderTaskBlocks = (blocks) => {
+      if (!blocks || blocks.length === 0) {
+        return `<div style="font-size:12px; color:var(--text-muted); font-style:italic; text-align:center; padding:10px;">Aún no has agregado bloques a esta tarea. Usa los botones de arriba para añadir notas, listas, cuadrículas o carruseles.</div>`;
+      }
+
+      return blocks.map((blk, idx) => {
+        if (blk.type === 'callout') {
+          return `
+            <div class="notion-block-card" data-block-id="${blk.id}">
+              <div class="notion-block-header">
+                <span>💡 Callout / Alerta Destacada</span>
+                <div>
+                  <button type="button" class="move-block-up icon-btn-subtle" data-idx="${idx}">▲</button>
+                  <button type="button" class="move-block-down icon-btn-subtle" data-idx="${idx}">▼</button>
+                  <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
+                </div>
+              </div>
+              <div class="notion-callout">
+                <input type="text" class="block-callout-icon" data-block-id="${blk.id}" value="${blk.icon || '💡'}" style="width:30px; font-size:18px; text-align:center; border:none; background:none;" />
+                <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                  <input type="text" class="block-callout-title form-control" data-block-id="${blk.id}" value="${blk.title || ''}" placeholder="Título del destacado..." style="font-weight:700; font-size:13px;" />
+                  <textarea class="block-callout-text form-control" data-block-id="${blk.id}" rows="2" placeholder="Detalle o nota destacada...">${blk.text || ''}</textarea>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        if (blk.type === 'table') {
+          const rows = Array.isArray(blk.rows) ? blk.rows : [];
+          return `
+            <div class="notion-block-card" data-block-id="${blk.id}">
+              <div class="notion-block-header">
+                <span>📊 Cuadrícula / Tabla Estilo Notion</span>
+                <div>
+                  <button type="button" class="move-block-up icon-btn-subtle" data-idx="${idx}">▲</button>
+                  <button type="button" class="move-block-down icon-btn-subtle" data-idx="${idx}">▼</button>
+                  <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
+                </div>
+              </div>
+              <input type="text" class="block-table-title form-control" data-block-id="${blk.id}" value="${blk.title || 'Tabla de Métricas'}" style="font-weight:700; font-size:13px;" />
+              <table class="notion-grid-table">
+                <thead>
+                  <tr>
+                    <th>Métrica / Ítem</th>
+                    <th>Meta</th>
+                    <th>Realista</th>
+                    <th>Desafiante</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map((r, rIdx) => `
+                    <tr>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="0" value="${r[0] || ''}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="1" value="${r[1] || ''}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="2" value="${r[2] || ''}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="3" value="${r[3] || ''}" style="font-size:12px;" /></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <button type="button" class="btn btn-sm add-table-row-btn" data-block-id="${blk.id}" style="font-size:11px; align-self:flex-start; margin-top:4px;">+ Añadir Fila</button>
+            </div>
+          `;
+        }
+
+        if (blk.type === 'carousel') {
+          const images = Array.isArray(task.attachments) ? task.attachments.filter(a => a.isImage) : [];
+          return `
+            <div class="notion-block-card" data-block-id="${blk.id}">
+              <div class="notion-block-header">
+                <span>🎠 Carrusel de Imágenes & Galería</span>
+                <div>
+                  <button type="button" class="move-block-up icon-btn-subtle" data-idx="${idx}">▲</button>
+                  <button type="button" class="move-block-down icon-btn-subtle" data-idx="${idx}">▼</button>
+                  <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
+                </div>
+              </div>
+              ${images.length > 0 ? `
+                <div class="notion-carousel-slider">
+                  ${images.map(img => `
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                      <img src="${img.url}" class="carousel-slide-item" alt="Slide" />
+                      <span style="font-size:10px; color:var(--text-muted); width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${img.name}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `<div style="font-size:11px; color:var(--text-muted);">Adjunta imágenes a la tarjeta para que se proyecten automáticamente en el carrusel.</div>`}
+            </div>
+          `;
+        }
+
+        if (blk.type === 'note') {
+          return `
+            <div class="notion-block-card" data-block-id="${blk.id}">
+              <div class="notion-block-header">
+                <span>📝 Bloque de Nota / Texto Libre</span>
+                <div>
+                  <button type="button" class="move-block-up icon-btn-subtle" data-idx="${idx}">▲</button>
+                  <button type="button" class="move-block-down icon-btn-subtle" data-idx="${idx}">▼</button>
+                  <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
+                </div>
+              </div>
+              <input type="text" class="block-note-title form-control" data-block-id="${blk.id}" value="${blk.title || ''}" placeholder="Título del bloque de notas..." style="font-weight:600; font-size:13px;" />
+              <textarea class="block-note-content form-control" data-block-id="${blk.id}" rows="3" placeholder="Escribe aquí notas adicionales, listas o minuta..." style="font-size:12px;">${blk.text || ''}</textarea>
+            </div>
+          `;
+        }
+
+        return '';
+      }).join('');
+    };
+
     const hasCover = Boolean(task.cover_image);
     const coverBannerHtml = hasCover ? `
       <div class="modal-cover-banner" style="background-image: url('${task.cover_image}');">
