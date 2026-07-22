@@ -1,14 +1,27 @@
 import { odooClient } from './odooApi.js';
 import { projectsList, initialMockStages } from './mockData.js';
 
-const AVAILABLE_TAGS = [
-  { id: 1, name: '🤝 Ventas VIP', color: 'amber' },
-  { id: 2, name: '🎨 Producción', color: 'purple' },
-  { id: 3, name: '🌐 Expansión Nacional', color: 'blue' },
-  { id: 4, name: '📦 Inventario Tiendas', color: 'emerald' },
-  { id: 5, name: '📅 Junta Semanal', color: 'red' },
-  { id: 6, name: '🚨 Urgente', color: 'red' }
-];
+function getAvailableTags() {
+  const stored = localStorage.getItem('notion_custom_tags');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
+  return [
+    { id: 1, name: '🤝 Ventas VIP', color: 'amber' },
+    { id: 2, name: '🎨 Producción', color: 'purple' },
+    { id: 3, name: '🌐 Expansión Nacional', color: 'blue' },
+    { id: 4, name: '📦 Inventario Tiendas', color: 'emerald' },
+    { id: 5, name: '📅 Junta Semanal', color: 'red' },
+    { id: 6, name: '🚨 Urgente', color: 'red' }
+  ];
+}
+
+function saveAvailableTags(tags) {
+  localStorage.setItem('notion_custom_tags', JSON.stringify(tags));
+}
 
 const STAGE_COLORS = [
   'var(--column-blue)',
@@ -18,6 +31,8 @@ const STAGE_COLORS = [
   'var(--column-emerald)',
   'var(--column-gray)'
 ];
+
+const EMOJI_PRESETS = ['💳', '🤖', '📢', '🌐', '🎟️', '📦', '📍', '⚖️', '📘', '🎨', '🎁', '📅', '🚀', '📊', '💼', '📄'];
 
 class NotionKanbanApp {
   constructor() {
@@ -79,7 +94,6 @@ class NotionKanbanApp {
   }
 
   initUndoSystem() {
-    // Global Keyboard Listener for Ctrl + Z / Cmd + Z
     window.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
@@ -733,7 +747,7 @@ class NotionKanbanApp {
       if (!task) return;
 
       const currentStageId = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
-      if (Number(currentStageId) === Number(stageId)) return; // No change
+      if (Number(currentStageId) === Number(stageId)) return;
 
       task.stage_id = [Number(stageId), stageName];
       odooClient.persistDemo();
@@ -776,6 +790,7 @@ class NotionKanbanApp {
         try {
           const newTask = await odooClient.createTask(title, stageId, stageName, this.currentProjectId);
           newTask.projectId = this.currentProjectId;
+          newTask.icon = '📄';
           newTask.subtasks = [];
           newTask.attachments = [];
           this.tasks.push(newTask);
@@ -916,9 +931,20 @@ class NotionKanbanApp {
       </div>
     `).join('');
 
-    const tagsHtml = AVAILABLE_TAGS.map(tag => {
+    // Dynamic Tag Management
+    const availableTags = getAvailableTags();
+    const tagsHtml = availableTags.map(tag => {
       const checked = task.tag_ids.some(t => Number(t.id) === Number(tag.id) || t.name === tag.name) ? 'checked' : '';
-      return `<label style="cursor: pointer; font-size: 12px;"><input type="checkbox" class="tag-chk" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-tag-color="${tag.color}" ${checked} /> ${tag.name}</label>`;
+      return `
+        <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-subtle); padding: 4px 8px; border-radius: 14px; border: 1px solid var(--border-light);">
+          <label style="cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+            <input type="checkbox" class="tag-chk" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-tag-color="${tag.color}" ${checked} />
+            <span class="tag-pill tag-${tag.color || 'blue'}">${tag.name}</span>
+          </label>
+          <button type="button" class="edit-tag-btn icon-btn-subtle" data-tag-id="${tag.id}" title="Editar etiqueta" style="font-size: 10px; padding: 0 2px;">✏️</button>
+          <button type="button" class="delete-tag-btn icon-btn-subtle" data-tag-id="${tag.id}" title="Eliminar etiqueta" style="font-size: 10px; padding: 0 2px;">🗑️</button>
+        </div>
+      `;
     }).join(' ');
 
     const renderAttachments = Array.isArray(task.attachments) ? task.attachments.map(att => `
@@ -959,15 +985,30 @@ class NotionKanbanApp {
       `;
     }
 
+    // Emoji Presets Bar
+    const emojiPresetsHtml = EMOJI_PRESETS.map(e => `<button type="button" class="emoji-preset-btn" data-emoji="${e}" style="background:none; border:none; font-size:16px; cursor:pointer; padding:2px;">${e}</button>`).join('');
+
     this.detailModalBodyEl.innerHTML = `
       ${coverBannerHtml}
 
-      <div class="form-group">
-        <label>Título de la Tarea / Bitácora</label>
-        <input type="text" id="detail-task-name" class="form-control" value="${task.name}" style="font-size: 16px; font-weight: 600;" />
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <div class="form-group" style="width: 70px;">
+          <label>Icono</label>
+          <input type="text" id="detail-task-icon" class="form-control" value="${task.icon || '📄'}" style="text-align: center; font-size: 18px;" />
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label>Título de la Tarea / Proyecto</label>
+          <input type="text" id="detail-task-name" class="form-control" value="${task.name}" style="font-size: 16px; font-weight: 600;" />
+        </div>
       </div>
 
-      <div class="form-group">
+      <!-- Emoji Presets bar -->
+      <div style="display:flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; align-items:center;">
+        <span style="font-size:11px; color:var(--text-muted);">Iconos rápidos:</span>
+        ${emojiPresetsHtml}
+      </div>
+
+      <div class="form-group" style="margin-top: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
           <label>Progreso General</label>
           <span style="font-size: 12px; font-weight: 700; color: #10b981;">${percent}% Completado</span>
@@ -1006,9 +1047,13 @@ class NotionKanbanApp {
         </div>
       </div>
 
+      <!-- Editable Tags Management -->
       <div class="form-group">
-        <label>Etiquetas / Categorías</label>
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label>🏷️ Etiquetas / Categorías</label>
+          <button type="button" id="add-custom-tag-btn" class="btn btn-sm" style="font-size: 11px; padding: 2px 8px;">+ Crear Nueva Etiqueta</button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
           ${tagsHtml}
         </div>
       </div>
@@ -1102,6 +1147,65 @@ class NotionKanbanApp {
       </div>
     `;
 
+    // Emoji Presets Click Handler
+    this.detailModalBodyEl.querySelectorAll('.emoji-preset-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const emoji = e.target.dataset.emoji;
+        document.getElementById('detail-task-icon').value = emoji;
+      });
+    });
+
+    // Tag Manager Event Handlers
+    const addTagBtn = document.getElementById('add-custom-tag-btn');
+    if (addTagBtn) {
+      addTagBtn.addEventListener('click', () => {
+        const tagName = prompt('Nombre de la nueva etiqueta:');
+        if (tagName && tagName.trim()) {
+          const colorOpt = prompt('Color de la etiqueta (amber, purple, blue, emerald, red, pink, gray, indigo):', 'blue');
+          const validColors = ['amber', 'purple', 'blue', 'emerald', 'red', 'pink', 'gray', 'indigo'];
+          const finalColor = validColors.includes((colorOpt || '').toLowerCase().trim()) ? colorOpt.toLowerCase().trim() : 'blue';
+          
+          const tags = getAvailableTags();
+          tags.push({ id: Date.now(), name: tagName.trim(), color: finalColor });
+          saveAvailableTags(tags);
+          this.openDetailModal(task);
+        }
+      });
+    }
+
+    this.detailModalBodyEl.querySelectorAll('.edit-tag-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tagId = Number(e.target.dataset.tagId);
+        const tags = getAvailableTags();
+        const targetTag = tags.find(t => Number(t.id) === tagId);
+        if (!targetTag) return;
+
+        const newName = prompt('Editar nombre de la etiqueta:', targetTag.name);
+        if (newName && newName.trim()) {
+          const newColor = prompt('Editar color de la etiqueta (amber, purple, blue, emerald, red, pink, gray, indigo):', targetTag.color);
+          targetTag.name = newName.trim();
+          if (newColor && newColor.trim()) targetTag.color = newColor.trim();
+          saveAvailableTags(tags);
+          this.openDetailModal(task);
+        }
+      });
+    });
+
+    this.detailModalBodyEl.querySelectorAll('.delete-tag-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tagId = Number(e.target.dataset.tagId);
+        let tags = getAvailableTags();
+        tags = tags.filter(t => Number(t.id) !== tagId);
+        saveAvailableTags(tags);
+        task.tag_ids = task.tag_ids.filter(t => Number(t.id) !== tagId);
+        odooClient.persistDemo();
+        this.openDetailModal(task);
+      });
+    });
+
+    // Sub-Kanban Drag and Drop
     this.detailModalBodyEl.querySelectorAll('.sub-kanban-card').forEach(subCard => {
       subCard.addEventListener('dragstart', (e) => {
         e.stopPropagation();
@@ -1299,6 +1403,7 @@ class NotionKanbanApp {
     if (saveDetailBtn) {
       saveDetailBtn.addEventListener('click', async () => {
         const newName = document.getElementById('detail-task-name').value.trim();
+        const newIcon = document.getElementById('detail-task-icon').value.trim();
         const newStageId = document.getElementById('detail-task-stage').value;
         const newPriority = document.getElementById('detail-task-priority').value;
         const newDeadline = document.getElementById('detail-task-deadline').value;
@@ -1325,6 +1430,7 @@ class NotionKanbanApp {
         const stageName = stageObj ? stageObj.name : 'Actualizado';
 
         task.name = newName;
+        task.icon = newIcon || '📄';
         task.priority = newPriority;
         task.date_deadline = newDeadline;
         task.description = newDesc;
