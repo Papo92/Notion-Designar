@@ -58,3 +58,20 @@ Este documento registra de forma exhaustiva todos los fallos detectados, sus cau
 - **Síntoma**: Cambios realizados en `server.js` en el VPS no surtían efecto al ejecutar `docker restart`.
 - **Causa Raíz**: `server.js` fue copiado dentro de la imagen en la etapa de `docker build`, por lo que el contenedor usaba el archivo compilado originalmente.
 - **Solución**: Se actualizó `docker-compose.yaml` para montar `./server.js:/app/server.js` y `./public:/app/public` como volúmenes en vivo.
+
+---
+
+## 🛑 FALLO 8: ReferenceError por Referencia a Función de Renderizado en Template Literal (Temporal Dead Zone)
+- **Síntoma**: Al hacer clic en cualquier tarjeta o intentar abrir el modal de detalles, la aplicación dejaba de responder silenciosamente y en consola mostraba `ReferenceError: Cannot access 'renderTaskBlocks' before initialization`.
+- **Causa Raíz**: Se invocó `${renderTaskBlocks(task.blocks)}` dentro del `innerHTML` de `openDetailModal()`, pero la función helper `const renderTaskBlocks = ...` estaba definida líneas más abajo en la misma función.
+- **Solución**: Se movieron todas las declaraciones auxiliares (`renderSubCards`, `renderAttachments`, `renderTaskBlocks`) al inicio del cuerpo del método `openDetailModal()`, antes de la asignación del `innerHTML`.
+- **Prevención**: Declarar siempre las funciones auxiliares de renderizado al inicio del scope del método antes de construir plantillas de texto HTML.
+
+---
+
+## 🛑 FALLO 9: Desincronización de Datos al Añadir un Nuevo Proyecto (Ventas)
+- **Síntoma**: El nuevo espacio de trabajo "Ventas & Juntas Semanales" aparecía en el selector, pero las columnas y tarjetas no se mostraban.
+- **Causa Raíz**: `localStorage['notion_demo_tasks']` contenía los datos de sesiones previas. La validación `hasDesignarCards` evaluaba como verdadera y prevenía la reconstrucción automática del `localStorage` con las tarjetas del nuevo proyecto.
+- **Solución**: Se añadió la verificación `hasVentasCards` en `odooApi.js` y se incrementó `DATA_VERSION` a `'notion-v8-ventas-force-reset'`.
+- **Prevención**: Al añadir un nuevo proyecto a `mockData.js`, registrar inmediatamente su comprobación `has[Nombre]Cards` en `odooApi.js` para forzar la re-semilla en todos los navegadores.
+
