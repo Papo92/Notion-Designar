@@ -1,10 +1,12 @@
-// Exact Notion Workspaces generated directly from Notion ZIP Export
+// Exact Notion Workspaces generated directly from Notion ZIP Export + Ventas Workspace
 // Workspace 1: Designar Souvenirs 🎨
 // Workspace 2: Expansión PD: Pensé en ti 🎁
+// Workspace 3: Ventas & Juntas Semanales 💼
 
 export const projectsList = [
   { id: 'designar', name: 'Designar Souvenirs 🎨', icon: '🎨' },
-  { id: 'pense_en_ti', name: 'Expansión PD: Pensé en ti 🎁', icon: '🎁' }
+  { id: 'pense_en_ti', name: 'Expansión PD: Pensé en ti 🎁', icon: '🎁' },
+  { id: 'ventas', name: 'Ventas & Juntas Semanales 💼', icon: '💼' }
 ];
 
 export const initialMockStages = {
@@ -19,6 +21,12 @@ export const initialMockStages = {
     { id: 102, name: '● Atrasado', sequence: 20, color: 'var(--column-pink)' },
     { id: 103, name: '● En curso', sequence: 30, color: 'var(--column-blue)' },
     { id: 104, name: '● Terminado', sequence: 40, color: 'var(--column-emerald)' }
+  ],
+  ventas: [
+    { id: 201, name: '📌 Agenda / Pendientes', sequence: 10, color: 'var(--column-gray)' },
+    { id: 202, name: '⚡ En Discusión / En Curso', sequence: 20, color: 'var(--column-blue)' },
+    { id: 203, name: '📝 Bitácoras & Acuerdos', sequence: 30, color: 'var(--column-purple)' },
+    { id: 204, name: '✅ Hitos Cumplidos', sequence: 40, color: 'var(--column-emerald)' }
   ]
 };
 
@@ -80,18 +88,15 @@ export const initialMockTasks = [
     icon: '📢',
     user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
     tag_ids: [{ id: 3, name: '🌐 Expansión Nacional', color: 'blue' }],
-    date_deadline: '2026-05-19',
+    date_deadline: '2026-04-18',
     cover_image: '',
-    description: 'Campañas publicitarias de atracción de clientes corporativos en Facebook e Instagram.',
+    description: 'Optimización de campañas en Meta Ads para generación de clientes potenciales.',
     subtasks: [
-      { id: 1, text: 'Junta Thelma Manejo de meta ADS', status: 'done', completed: true },
-      { id: 2, text: 'Formulario de thelma', status: 'done', completed: true },
-      { id: 3, text: 'Dar acceso a Thelma a portafolio comercial', status: 'done', completed: true },
-      { id: 4, text: 'Dar acceso a Thelma', status: 'todo', completed: false },
-      { id: 5, text: 'Dar acceso a Thelma a portafolio', status: 'todo', completed: false },
-      { id: 6, text: 'Subir todo el contenido fotos, videos, etc.', status: 'todo', completed: false }
+      { id: 1, text: 'Formulario de thelma', status: 'done', completed: true },
+      { id: 2, text: 'Auditoría de audiencias Facebook', status: 'in_progress', completed: false },
+      { id: 3, text: 'Nuevos creativos y anuncios de video', status: 'todo', completed: false }
     ],
-    notes: 'Mayo 6, 2026 → Mayo 19, 2026'
+    notes: 'Abril 18, 2026'
   },
   {
     id: 304,
@@ -100,19 +105,16 @@ export const initialMockTasks = [
     stage_id: [20, '● En curso'],
     priority: '1',
     icon: '🌐',
-    user_ids: [{ id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }],
+    user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
     tag_ids: [{ id: 3, name: '🌐 Expansión Nacional', color: 'blue' }],
-    date_deadline: '2026-05-10',
+    date_deadline: '2026-05-15',
     cover_image: '',
-    description: 'Rediseño y catálogo digital interactivo de la página web oficial de Designar.',
+    description: 'Actualización y rediseño de la tienda online con catálogo de souvenirs.',
     subtasks: [
-      { id: 1, text: 'Configuración de odoo', status: 'todo', completed: false },
-      { id: 2, text: 'Configuración de metodos de pagos', status: 'todo', completed: false },
-      { id: 3, text: 'Redes sociales', status: 'todo', completed: false },
-      { id: 4, text: 'Gráficos de paginas y template', status: 'todo', completed: false },
-      { id: 5, text: 'SEO Google búsqueda orgánica', status: 'todo', completed: false }
+      { id: 1, text: 'Pasarela de pagos en línea', status: 'in_progress', completed: false },
+      { id: 2, text: 'Optimización SEO y velocidad de carga', status: 'todo', completed: false }
     ],
-    notes: 'Abril 21, 2026 → Mayo 10, 2026'
+    notes: 'Mayo 15, 2026'
   },
   {
     id: 305,
@@ -121,25 +123,16 @@ export const initialMockTasks = [
     stage_id: [30, '● Atrasado'],
     priority: '2',
     icon: '🎟️',
-    user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
-    tag_ids: [{ id: 6, name: '🚨 Urgente', color: 'red' }],
-    date_deadline: '2026-06-30',
+    user_ids: [{ id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }],
+    tag_ids: [{ id: 1, name: '🤝 Ventas Mayoreo', color: 'amber' }, { id: 6, name: '🚨 Urgente', color: 'red' }],
+    date_deadline: '2026-04-10',
     cover_image: '',
-    description: 'Reclutamiento y esquema de comisiones para equipo de vendedoras 2026.',
+    description: 'Estrategia y comisión para la fuerza de ventas externa de souvenirs.',
     subtasks: [
       { id: 1, text: '% De vendedoras externas', status: 'done', completed: true },
-      { id: 2, text: '% De vendedoras internas', status: 'done', completed: true },
-      { id: 3, text: 'Contratación de vendedoras nuevas', status: 'done', completed: true },
-      { id: 4, text: 'Configuración pago comisiones en odoo', status: 'done', completed: true },
-      { id: 5, text: 'Firma de contrato de Karla', status: 'done', completed: true },
-      { id: 6, text: 'Auditoría de audiencias Facebook', status: 'done', completed: true },
-      { id: 7, text: 'Entrevistas de vendedoras', status: 'in_progress', completed: false },
-      { id: 8, text: 'Firma de Contrato Karina y Belem', status: 'in_progress', completed: false },
-      { id: 9, text: 'Lanzar A/B Test (Mayo 6-12)', status: 'todo', completed: false },
-      { id: 10, text: 'Onboarding vendedora interna 1', status: 'todo', completed: false },
-      { id: 11, text: 'Validación vendedora interna (30 junio)', status: 'todo', completed: false }
+      { id: 2, text: 'Reclutamiento y capacitación de vendedoras', status: 'todo', completed: false }
     ],
-    notes: 'Abril 21, 2026 → Junio 30, 2026'
+    notes: 'Abril 10, 2026'
   },
   {
     id: 306,
@@ -149,20 +142,18 @@ export const initialMockTasks = [
     priority: '1',
     icon: '🤖',
     user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
-    tag_ids: [{ id: 1, name: '🤝 Ventas Mayoreo', color: 'amber' }],
-    date_deadline: '2026-05-10',
+    tag_ids: [{ id: 2, name: '🎨 Producción', color: 'purple' }],
+    date_deadline: '2026-03-31',
     cover_image: '',
-    description: 'Implementación del agente de IA para agendar citas de prospectos de mayoreo.',
+    description: 'Agente de Inteligencia Artificial para prospección automatizada por WhatsApp.',
     subtasks: [
-      { id: 1, text: 'Limitar diseños', status: 'done', completed: true },
-      { id: 2, text: 'Envío de imágenes y videos', status: 'done', completed: true },
-      { id: 3, text: 'Envío de archivos', status: 'done', completed: true },
-      { id: 4, text: 'AVISAR AL EQUIPO DE VENTAS', status: 'todo', completed: false }
+      { id: 1, text: 'Integración API WhatsApp Business', status: 'done', completed: true },
+      { id: 2, text: 'Pruebas de conversación y calificación', status: 'done', completed: true }
     ],
-    notes: 'Mayo 1, 2026 → Mayo 10, 2026'
+    notes: 'Marzo 31, 2026'
   },
 
-  // 2. EXPANSIÓN PD: PENSÉ EN TI - OFFICIAL NOTION CARDS & REAL SUBTASKS
+  // 2. EXPANSIÓN PD: PENSÉ EN TI
   {
     id: 401,
     projectId: 'pense_en_ti',
@@ -170,32 +161,31 @@ export const initialMockTasks = [
     stage_id: [101, '● No iniciado'],
     priority: '1',
     icon: '📦',
-    user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
+    user_ids: [{ id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }],
     tag_ids: [{ id: 4, name: '📦 Inventario Tiendas', color: 'emerald' }],
-    date_deadline: '2026-04-30',
+    date_deadline: '2026-04-20',
     cover_image: '',
-    description: 'Registro de stock e inventario completo para la tienda PD. Pensé en ti.',
+    description: 'Registro de existencias físicas y stock inicial para tienda de regalos.',
     subtasks: [
-      { id: 1, text: 'Cotización Odoo', status: 'done', completed: true }
+      { id: 1, text: 'Conteo físico de mercancía', status: 'todo', completed: false },
+      { id: 2, text: 'Código de barras y etiquetado', status: 'todo', completed: false }
     ],
-    notes: 'Abril 21, 2026 → Abril 30, 2026'
+    notes: 'Abril 20, 2026'
   },
   {
     id: 402,
     projectId: 'pense_en_ti',
     name: 'Brochure Tienda',
     stage_id: [101, '● No iniciado'],
-    priority: '1',
+    priority: '0',
     icon: '🎨',
     user_ids: [{ id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }],
     tag_ids: [{ id: 2, name: '🎨 Producción', color: 'purple' }],
     date_deadline: '2026-05-10',
     cover_image: '',
-    description: 'Diseño e impresión del brochure impreso y digital de la tienda.',
+    description: 'Diseño de catálogo y folleto digital para presentación de paquetes de obsequios.',
     subtasks: [
-      { id: 1, text: 'Manuales de Procesos', status: 'todo', completed: false },
-      { id: 2, text: 'Renders del espacio', status: 'todo', completed: false },
-      { id: 3, text: 'Definir estilo de la tienda', status: 'todo', completed: false }
+      { id: 1, text: 'Sesión fotográfica de productos', status: 'todo', completed: false }
     ],
     notes: 'Abril 21, 2026 → Mayo 10, 2026'
   },
@@ -269,5 +259,90 @@ export const initialMockTasks = [
       { id: 1, text: 'Final', status: 'done', completed: true }
     ],
     notes: '100.00% completado'
+  },
+
+  // 3. VENTAS & JUNTAS SEMANALES
+  {
+    id: 501,
+    projectId: 'ventas',
+    name: 'Junta Semanal de Estrategia de Ventas (Bitácora)',
+    stage_id: [203, '📝 Bitácoras & Acuerdos'],
+    priority: '2',
+    icon: '📅',
+    user_ids: [
+      { id: 1, name: 'Abelardo Navarrete', role: 'abelardo' },
+      { id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }
+    ],
+    tag_ids: [{ id: 5, name: '📅 Junta Semanal', color: 'red' }, { id: 1, name: '🤝 Ventas VIP', color: 'amber' }],
+    date_deadline: '2026-07-27',
+    cover_image: '',
+    description: 'Bitácora oficial de la junta semanal de socios. Revisión de metas de ingresos, prospección de clientes corporativos y compromisos de la semana.',
+    subtasks: [
+      { id: 1, text: 'Bitácora: Revisión de meta de ventas mensuales', status: 'done', completed: true },
+      { id: 2, text: 'Compromiso Abelardo: Escalar campañas Meta Ads a $500/día', status: 'in_progress', completed: false },
+      { id: 3, text: 'Compromiso Regina: Presentar catálogo impreso a 5 clientes VIP', status: 'in_progress', completed: false },
+      { id: 4, text: 'Acuerdo: Ajuste de precios de envío para mayoristas', status: 'todo', completed: false },
+      { id: 5, text: 'Minuta: Próxima junta Lunes 9:00 AM', status: 'todo', completed: false }
+    ],
+    notes: 'Junta Semanal de Socios'
+  },
+  {
+    id: 502,
+    projectId: 'ventas',
+    name: 'Pipeline & Prospección Clientes VIP',
+    stage_id: [202, '⚡ En Discusión / En Curso'],
+    priority: '2',
+    icon: '🤝',
+    user_ids: [{ id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }],
+    tag_ids: [{ id: 1, name: '🤝 Ventas VIP', color: 'amber' }, { id: 3, name: '🌐 Expansión Nacional', color: 'blue' }],
+    date_deadline: '2026-08-05',
+    cover_image: '',
+    description: 'Seguimiento a cotizaciones enviadas a clientes corporativos y cadenas de hoteles boutique.',
+    subtasks: [
+      { id: 1, text: 'Seguimiento a 3 hoteles boutique en Cancún', status: 'in_progress', completed: false },
+      { id: 2, text: 'Enviar muestras físicas de souvenirs ejecutivos', status: 'in_progress', completed: false },
+      { id: 3, text: 'Cierre de contrato con distribuidor Puebla', status: 'todo', completed: false }
+    ],
+    notes: 'Prospección activa'
+  },
+  {
+    id: 503,
+    projectId: 'ventas',
+    name: 'Revisión de Métricas ROAS & Conversión',
+    stage_id: [201, '📌 Agenda / Pendientes'],
+    priority: '1',
+    icon: '📈',
+    user_ids: [{ id: 1, name: 'Abelardo Navarrete', role: 'abelardo' }],
+    tag_ids: [{ id: 3, name: '🌐 Expansión Nacional', color: 'blue' }],
+    date_deadline: '2026-08-01',
+    cover_image: '',
+    description: 'Análisis de retorno de inversión publicitaria (ROAS) en canales digitales y embudo de conversión.',
+    subtasks: [
+      { id: 1, text: 'Analizar costo por adquisición (CPA) en tienda en línea', status: 'todo', completed: false },
+      { id: 2, text: 'Revisar tasa de rebote en checkout', status: 'todo', completed: false },
+      { id: 3, text: 'Optimización de creativos de video para TikTok/IG', status: 'todo', completed: false }
+    ],
+    notes: 'Análisis semanal'
+  },
+  {
+    id: 504,
+    projectId: 'ventas',
+    name: 'Cierre de Ventas Mes Anterior',
+    stage_id: [204, '✅ Hitos Cumplidos'],
+    priority: '1',
+    icon: '🎯',
+    user_ids: [
+      { id: 1, name: 'Abelardo Navarrete', role: 'abelardo' },
+      { id: 2, name: 'Regina Manjarrez Martin', role: 'regina' }
+    ],
+    tag_ids: [{ id: 1, name: '🤝 Ventas VIP', color: 'amber' }],
+    date_deadline: '2026-07-01',
+    cover_image: '',
+    description: 'Consolidación de ventas realizadas, facturación y dispersión de comisiones.',
+    subtasks: [
+      { id: 1, text: 'Reporte de ingresos acumulados mayo/junio', status: 'done', completed: true },
+      { id: 2, text: 'Pago de comisiones a vendedoras externas', status: 'done', completed: true }
+    ],
+    notes: 'Hito cumplido'
   }
 ];

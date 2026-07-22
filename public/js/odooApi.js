@@ -1,7 +1,7 @@
 import { initialMockStages, initialMockTasks } from './mockData.js';
 
 // ⬆️ Bump this whenever mockData.js changes to force a localStorage reset
-const DATA_VERSION = 'notion-v6-full-official-export';
+const DATA_VERSION = 'notion-v7-ventas-juntas';
 
 class OdooApiClient {
   constructor() {
