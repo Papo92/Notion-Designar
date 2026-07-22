@@ -36,15 +36,15 @@ const EMOJI_PRESETS = ['💳', '🤖', '📢', '🌐', '🎟️', '📦', '📍'
 
 class NotionKanbanApp {
   constructor() {
-    this.currentProjectId = 'designar'; // 'designar', 'pense_en_ti'
-    this.currentViewMode = 'board'; // 'board', 'table', 'gallery'
+    this.currentProjectId = localStorage.getItem('notion_active_project') || 'designar';
+    this.currentViewMode = localStorage.getItem('notion_active_view') || 'board';
+    this.activePartnerFilter = localStorage.getItem('notion_active_partner') || 'all';
     this.stages = [];
     this.tasks = [];
     this.undoHistory = []; // Stack for Ctrl+Z undo support
     this.draggedTaskId = null;
     this.draggedSubtaskId = null;
     this.searchQuery = '';
-    this.activePartnerFilter = 'all'; // 'all', 'abelardo', 'regina', 'both', 'urgent'
 
     this.initElements();
     this.bindEvents();
@@ -52,6 +52,7 @@ class NotionKanbanApp {
   }
 
   async init() {
+    this.restoreActiveUIState();
     this.updateStatusBadge();
     await this.loadData();
   }
@@ -154,10 +155,29 @@ class NotionKanbanApp {
     setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3500);
   }
 
+  restoreActiveUIState() {
+    if (this.projectSelectEl) {
+      this.projectSelectEl.value = this.currentProjectId;
+    }
+    this.viewTabs.forEach(tab => {
+      if (tab.dataset.view === this.currentViewMode) {
+        this.viewTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+      }
+    });
+    this.partnerBtns.forEach(btn => {
+      if (btn.dataset.filter === this.activePartnerFilter) {
+        this.partnerBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    });
+  }
+
   bindEvents() {
     if (this.projectSelectEl) {
       this.projectSelectEl.addEventListener('change', (e) => {
         this.currentProjectId = e.target.value;
+        localStorage.setItem('notion_active_project', e.target.value);
         this.loadData();
       });
     }
@@ -167,6 +187,7 @@ class NotionKanbanApp {
         this.viewTabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         this.currentViewMode = tab.dataset.view || 'board';
+        localStorage.setItem('notion_active_view', this.currentViewMode);
         this.renderCurrentView();
       });
     });
@@ -176,6 +197,7 @@ class NotionKanbanApp {
         this.partnerBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.activePartnerFilter = btn.dataset.filter || 'all';
+        localStorage.setItem('notion_active_partner', this.activePartnerFilter);
         this.renderCurrentView();
       });
     });
