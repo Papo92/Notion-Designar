@@ -93,6 +93,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for modern mobile browsers */
 }
 
 /* Header Navbar */
@@ -125,7 +126,7 @@ body {
 }
 
 .brand-title-group h1 {
-  font-size: 16px;
+  font-size: clamp(14px, 2vw, 16px);
   font-weight: 600;
   color: var(--text-main);
 }
@@ -161,12 +162,15 @@ body {
   padding: 0 24px;
   background-color: var(--bg-main);
   border-bottom: 1px solid var(--border-light);
+  gap: 12px;
 }
 
 .views-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .view-tab {
@@ -182,6 +186,7 @@ body {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .view-tab:hover {
@@ -200,6 +205,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Partner Filter Bar */
@@ -210,6 +216,8 @@ body {
   padding: 8px 24px;
   background-color: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-light);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .partner-btn {
@@ -225,6 +233,7 @@ body {
   background-color: var(--bg-card);
   color: var(--text-muted);
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .partner-btn:hover {
@@ -284,6 +293,7 @@ body {
   background-color: var(--bg-card);
   color: var(--text-main);
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -369,6 +379,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 20px 24px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .kanban-board {
@@ -380,8 +391,8 @@ body {
 
 /* Add Column Button */
 .add-column-btn {
-  width: 240px;
-  min-width: 240px;
+  width: 280px;
+  min-width: 280px;
   padding: 12px;
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius-lg);
@@ -398,51 +409,54 @@ body {
 }
 
 .add-column-btn:hover {
-  background-color: var(--bg-subtle);
-  color: var(--text-main);
   border-color: #2383e2;
+  color: #2383e2;
+  background-color: rgba(35, 131, 226, 0.05);
 }
 
-/* Notion Column Header Controls - Top Right Trash Button Pinning */
+/* Column Styling */
 .kanban-column {
-  width: 300px;
-  min-width: 300px;
+  width: 290px;
+  min-width: 290px;
   max-height: 100%;
-  display: flex;
-  flex-direction: column;
   background-color: var(--bg-sidebar);
   border-radius: var(--radius-lg);
-  padding: 10px;
   border: 1px solid var(--border-light);
-  transition: background-color 0.2s ease;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  transition: background-color 0.15s ease;
 }
 
 .kanban-column.drag-over {
-  background-color: var(--column-blue);
-  border-style: dashed;
+  background-color: var(--bg-hover);
+  border-color: #2383e2;
 }
 
 .column-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px 12px 8px;
-  position: relative;
+  padding-bottom: 4px;
 }
 
 .column-title-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
 }
 
 .column-color-indicator {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: 50%;
   cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.column-color-indicator:hover {
+  transform: scale(1.3);
 }
 
 .column-title {
@@ -450,28 +464,21 @@ body {
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: background-color 0.15s ease;
-}
-
-.column-title:hover {
-  background-color: var(--bg-hover);
 }
 
 .column-count {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  background-color: var(--bg-main);
-  padding: 1px 7px;
+  background-color: var(--bg-subtle);
+  padding: 1px 6px;
   border-radius: 10px;
 }
 
 .column-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .column-move-btn {
@@ -480,7 +487,7 @@ body {
   color: var(--text-muted);
   font-size: 11px;
   cursor: pointer;
-  padding: 2px 5px;
+  padding: 2px 4px;
   border-radius: 3px;
   transition: all 0.15s ease;
 }
@@ -488,14 +495,6 @@ body {
 .column-move-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-main);
-}
-
-/* Top-Right Trash Button Styling on Main Column */
-.column-delete-btn {
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
 .column-delete-btn:hover {
@@ -522,7 +521,7 @@ body {
   border-radius: 4px;
 }
 
-/* Notion Card Component Inline Edit */
+/* Notion Card Component */
 .notion-card {
   background-color: var(--bg-card);
   border-radius: var(--radius-md);
@@ -598,10 +597,10 @@ body {
 
 /* Progress Bar Component */
 .card-progress-wrapper {
-  margin: 6px 0;
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
 .progress-track {
@@ -610,18 +609,17 @@ body {
   background-color: var(--bg-subtle);
   border-radius: 3px;
   overflow: hidden;
-  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+  background-color: #2383e2;
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 
 .progress-fill.complete {
-  background: #10b981;
+  background-color: #10b981;
 }
 
 .progress-label {
@@ -632,47 +630,37 @@ body {
   text-align: right;
 }
 
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.tag-pill {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 7px;
-  border-radius: 4px;
-  line-height: 1.3;
-}
-
-.tag-purple { background-color: var(--tag-purple-bg); color: var(--tag-purple-txt); }
-.tag-blue { background-color: var(--tag-blue-bg); color: var(--tag-blue-txt); }
-.tag-emerald { background-color: var(--tag-emerald-bg); color: var(--tag-emerald-txt); }
-.tag-amber { background-color: var(--tag-amber-bg); color: var(--tag-amber-txt); }
-.tag-red { background-color: var(--tag-red-bg); color: var(--tag-red-txt); }
-.tag-gray { background-color: var(--tag-gray-bg); color: var(--tag-gray-txt); }
-
+/* Card Meta Footer */
 .card-meta-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--bg-subtle);
-  font-size: 11px;
-  color: var(--text-muted);
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .meta-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.priority-star {
+  font-size: 10px;
+  font-weight: 600;
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.15);
+  padding: 1px 6px;
+  border-radius: 10px;
 }
 
 .deadline-pill {
-  display: flex;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
@@ -683,69 +671,206 @@ body {
 }
 
 .subtasks-pill {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: var(--bg-subtle);
+  padding: 1px 6px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* User Avatars */
+.user-avatars {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.user-avatars {
-  display: flex;
-  align-items: center;
-}
-
 .avatar-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
+  font-weight: 600;
+  padding: 1px 6px;
   border-radius: 10px;
   color: #ffffff;
-  margin-left: -4px;
 }
 
-.avatar-badge.abelardo { background-color: #2563eb; }
+.avatar-badge.abelardo { background-color: #3b82f6; }
 .avatar-badge.regina { background-color: #ec4899; }
 .avatar-badge.both { background-color: #8b5cf6; }
 
-/* Priority Star */
-.priority-star {
-  color: #f59e0b;
-  font-size: 12px;
+/* Tag Pills */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
-/* Attachments Upload Zone */
+.tag-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.tag-blue { background-color: var(--tag-blue-bg); color: var(--tag-blue-txt); }
+.tag-purple { background-color: var(--tag-purple-bg); color: var(--tag-purple-txt); }
+.tag-amber { background-color: var(--tag-amber-bg); color: var(--tag-amber-txt); }
+.tag-emerald { background-color: var(--tag-emerald-bg); color: var(--tag-emerald-txt); }
+.tag-red { background-color: var(--tag-red-bg); color: var(--tag-red-txt); }
+.tag-gray { background-color: var(--tag-gray-bg); color: var(--tag-gray-txt); }
+.tag-pink { background-color: #fce7f3; color: #be185d; }
+.tag-indigo { background-color: #e0e7ff; color: #4338ca; }
+
+/* Quick Add Button inside Column */
+.quick-add-btn {
+  width: 100%;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  transition: all 0.15s ease;
+}
+
+.quick-add-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.quick-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid #2383e2;
+}
+
+.quick-add-input {
+  width: 100%;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-subtle);
+  color: var(--text-main);
+  font-size: 13px;
+  outline: none;
+}
+
+/* Notion Table & Gallery Views */
+.notion-table-view {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.notion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.notion-table th {
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+  background-color: var(--bg-sidebar);
+}
+
+.notion-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.notion-table tr:hover td {
+  background-color: var(--bg-hover);
+}
+
+.notion-gallery-view {
+  flex: 1;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.gallery-card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gallery-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.gallery-card-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  background-color: var(--bg-subtle);
+}
+
+.gallery-card-body {
+  padding: 12px;
+}
+
+/* File Attachments Component */
 .upload-dropzone {
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius-md);
   padding: 16px;
   text-align: center;
-  background-color: var(--bg-sidebar);
+  background-color: var(--bg-subtle);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .upload-dropzone:hover {
-  background-color: var(--bg-subtle);
   border-color: #2383e2;
+  background-color: rgba(35, 131, 226, 0.05);
 }
 
 .attachments-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
 
 .attachment-card {
-  background-color: var(--bg-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
   overflow: hidden;
-  position: relative;
-  display: flex;
-  flex-direction: column;
+  background-color: var(--bg-subtle);
 }
 
 .attachment-img-preview {
@@ -888,8 +1013,8 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -909,8 +1034,8 @@ body {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   box-shadow: var(--shadow-lg);
-  width: 90%;
-  max-width: 750px;
+  width: 92%;
+  max-width: 760px;
   max-height: 90vh;
   overflow-y: auto;
   padding: 24px;
@@ -1039,15 +1164,39 @@ body {
 }
 
 /* ============================================================
-   📱 Mobile Responsiveness & Anti-Overlap Media Queries
+   📱 Universal 100% Responsive & Anti-Overlap Architecture
    ============================================================ */
+
+/* Tablet Screens (768px - 1024px) */
+@media (max-width: 1024px) {
+  .app-header {
+    padding: 10px 16px;
+  }
+  .notion-views-bar, .partner-filter-bar {
+    padding: 6px 16px;
+  }
+  .kanban-workspace {
+    padding: 14px 16px;
+  }
+  .kanban-column {
+    width: 270px;
+    min-width: 270px;
+  }
+}
+
+/* Mobile Screens (< 768px) */
 @media (max-width: 768px) {
-  /* Header & Navigation Bar Anti-Overlap */
-  .header {
+  /* Prevent iOS Safari 16px Input Auto-Zoom Trap */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Header Navbar Stacking */
+  .app-header {
     padding: 10px 12px;
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
   }
 
   .brand-section {
@@ -1057,80 +1206,99 @@ body {
 
   .header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    gap: 8px;
     justify-content: space-between;
-  }
-
-  .view-switcher, .partner-filter {
-    overflow-x: auto;
-    width: 100%;
-    max-width: 100%;
-    padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
+    gap: 8px;
   }
 
   #project-select {
     flex: 1;
-    font-size: 13px;
-    max-width: 180px;
+    max-width: 170px;
   }
 
-  /* Kanban Board Touch Scrolling & Column Sizing */
+  .notion-views-bar {
+    padding: 0 12px;
+  }
+
+  .partner-filter-bar {
+    padding: 6px 12px;
+  }
+
+  .search-input-wrapper {
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .search-input:focus {
+    width: 100%;
+  }
+
+  /* Kanban Touch Scroll */
+  .kanban-workspace {
+    padding: 10px 12px;
+  }
+
   .kanban-board {
-    padding: 10px;
     gap: 12px;
-    -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
   }
 
   .kanban-column {
-    min-width: 82vw;
-    max-width: 85vw;
+    width: 84vw;
+    min-width: 270px;
     scroll-snap-align: center;
   }
 
-  /* Always show edit pencil icon on mobile (no hover state on touch) */
+  /* Always show edit title pencil icon on mobile touch screens */
   .edit-title-icon {
     opacity: 0.85 !important;
   }
 
-  /* Modal Anti-Overlap & Touch Optimization */
+  /* Modal Optimization for Mobile */
+  .modal-overlay {
+    padding: 10px;
+  }
+
   .modal-card {
-    width: 95vw;
-    max-width: 95vw;
+    width: 100%;
+    max-width: 100%;
     padding: 14px;
-    margin: 6px auto;
-    max-height: 93vh;
+    margin: 0;
+    max-height: 94vh;
     border-radius: 12px;
   }
 
-  /* Stack 3-column modal grids vertically on small screens */
-  .modal-card div[style*="grid-template-columns: 1fr 1fr 1fr"] {
-    grid-template-columns: 1fr !important;
-    gap: 8px !important;
+  .modal-cover-banner {
+    height: 120px;
   }
 
-  /* Stack Sub-Kanban columns vertically on mobile for clean touch interaction */
+  /* Stack 3-column modal form grids vertically on mobile */
+  .modal-card div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Stack Sub-Kanban columns vertically for touch clarity */
   .sub-kanban-board {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
   }
 
   .sub-kanban-col {
     min-height: 80px;
   }
 
-  /* Tables & Gallery Responsive */
-  .notion-table-view {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  /* Toast Notification positioning on mobile */
+  .undo-toast-container {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
   }
 
-  .notion-gallery-view {
-    grid-template-columns: 1fr;
-    padding: 12px;
+  .undo-toast {
+    justify-content: space-between;
+    width: 100%;
   }
 }
-
-
