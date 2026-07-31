@@ -29,7 +29,13 @@ jobs:
             docker restart odoo-notion-kanban
             echo "🚀 Despliegue automático completado con éxito."
 
+      # El contexto `secrets` NO esta disponible en el `if:` de un paso, solo en
+      # `with:`/`run:`/`env:`. Usarlo ahi invalida el workflow completo y GitHub
+      # cancela la ejecucion antes de crear ningun job. Se pasa por `env`, que si
+      # esta permitido en `if:`.
       - name: 🌐 Coolify Webhook Trigger (Opcional)
-        if: ${{ secrets.COOLIFY_WEBHOOK != '' }}
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+        if: ${{ env.COOLIFY_WEBHOOK != '' }}
         run: |
-          curl -X POST "${{ secrets.COOLIFY_WEBHOOK }}"
+          curl -X POST "$COOLIFY_WEBHOOK"
