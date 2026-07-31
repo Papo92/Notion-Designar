@@ -825,20 +825,32 @@ class NotionKanbanApp {
     const input = formEl.querySelector('input');
     if (input) input.focus();
 
+    let submitting = false;
     const submit = async () => {
+      if (submitting) return; // Evita doble alta con doble Enter durante el await
       const title = input.value.trim();
       if (title) {
+        submitting = true;
         try {
           const newTask = await odooClient.createTask(title, stageId, stageName, this.currentProjectId);
           newTask.projectId = this.currentProjectId;
           newTask.icon = '📄';
           newTask.subtasks = [];
           newTask.attachments = [];
-          this.tasks.push(newTask);
+
+          // En modo demo, createTask() ya insertó la tarea en odooClient.demoTasks,
+          // que es el MISMO arreglo que this.tasks. Insertarla de nuevo la duplicaba.
+          // En modo Odoo real no la inserta, así que aquí sigue haciendo falta.
+          if (!this.tasks.some(t => t === newTask || String(t.id) === String(newTask.id))) {
+            this.tasks.push(newTask);
+          }
+
           odooClient.persistDemo();
           this.renderCurrentView();
         } catch (err) {
           alert('Error creando tarea: ' + err.message);
+        } finally {
+          submitting = false;
         }
       } else {
         formEl.remove();

@@ -36,9 +36,31 @@ class OdooApiClient {
       this.persistDemo();
     } else {
       this.demoTasks = storedTasks;
+      // Limpia los duplicados que dejó el alta doble de tareas en versiones previas.
+      this.dedupeTasks();
       // Non-destructive top-up: if a whole seeded board is gone, re-seed just that
       // board instead of wiping the cache and destroying work on the other boards.
       this.seedMissingProjects();
+    }
+  }
+
+  // Elimina tarjetas con id repetido conservando la primera aparición.
+  dedupeTasks() {
+    const seen = new Set();
+    const unique = this.demoTasks.filter(t => {
+      const key = String(t.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const removed = this.demoTasks.length - unique.length;
+    if (removed > 0) {
+      // Se muta en su lugar: demoTasks se comparte por referencia con app.tasks.
+      this.demoTasks.length = 0;
+      this.demoTasks.push(...unique);
+      console.log(`⚡ Se eliminaron ${removed} tarjeta(s) duplicada(s) por id repetido.`);
+      this.persistDemo();
     }
   }
 

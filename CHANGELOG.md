@@ -135,3 +135,15 @@ Este documento registra de forma exhaustiva todos los fallos detectados, sus cau
 - **Causa Raíz**: En modo demo `getTasks()` devuelve `this.demoTasks` directamente, así que `app.tasks` y `odooClient.demoTasks` son el **mismo** arreglo. El borrado hacía `this.tasks = this.tasks.filter(...)`, que crea un arreglo nuevo y rompe ese vínculo; el `odooClient.persistDemo()` siguiente serializaba `demoTasks`, que aún contenía la tarea eliminada.
 - **Solución**: Se sustituyó por `this.tasks.splice(taskIndex, 1)`, que muta el arreglo compartido en su lugar. El mismo criterio se aplicó al borrado de subtareas.
 - **Prevención**: Con arreglos compartidos por referencia entre módulos, mutar siempre en su lugar (`splice`, `push`); nunca reasignar con `filter()`/`map()`.
+
+---
+
+## 🛑 FALLO 17: Alta Duplicada de Tareas por Doble Inserción en el Arreglo Compartido
+- **Síntoma**: Al crear una tarjeta desde el botón "Añadir tarjeta" de una columna, aparecían **dos** tarjetas idénticas en lugar de una.
+- **Causa Raíz**: En modo demo `odooClient.createTask()` ya inserta la tarea con `this.demoTasks.push(newTask)`. Como `getTasks()` devuelve `this.demoTasks` **por referencia**, `app.tasks` y `odooClient.demoTasks` son el mismo arreglo, así que el `this.tasks.push(newTask)` del handler en `app.js` insertaba el mismo objeto por segunda vez. Ambas copias compartían el mismo `id`, lo que además rompía el borrado y la edición. En modo Odoo real `createTask()` no inserta, por lo que ahí ese `push` sí es necesario.
+- **Solución**:
+  1. En `app.js` el `push` solo se ejecuta si la tarea no está ya en el arreglo (`t === newTask || String(t.id) === String(newTask.id)`), lo que funciona en ambos modos.
+  2. Se añadió un guardián de reentrada `submitting` para que un doble Enter durante el `await` no cree dos tarjetas.
+  3. En `odooApi.js` se añadió `dedupeTasks()`, que al cargar elimina las tarjetas con `id` repetido que quedaron guardadas en `localStorage` por versiones anteriores, conservando la primera aparición.
+- **Alcance**: Presente desde la v3.8.0; no fue introducido por las correcciones de la v5.3.0.
+- **Prevención**: Cuando un método de la capa de datos ya inserta el registro, el llamador no debe volver a insertarlo. Con arreglos compartidos por referencia entre módulos, definir un único punto de inserción.
