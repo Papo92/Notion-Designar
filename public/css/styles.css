@@ -1312,6 +1312,12 @@ body {
     right: 12px;
   }
 
+  .undo-toast {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
 /* Notion Block Content Builder */
 .notion-block-container {
   display: flex;

@@ -23,6 +23,26 @@ function saveAvailableTags(tags) {
   localStorage.setItem('notion_custom_tags', JSON.stringify(tags));
 }
 
+// Escapa texto antes de interpolarlo en HTML (atributos value="..." incluidos).
+// Sin esto, un valor como: Lona 12" x 18"  se corta en la primera comilla.
+function esc(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// IDs únicos: Date.now() colisiona cuando se crean dos elementos en el mismo
+// milisegundo (los handlers son síncronos), y luego borrar uno borra los dos.
+let __lastUid = 0;
+function uid() {
+  __lastUid = Math.max(Date.now(), __lastUid + 1);
+  return __lastUid;
+}
+
 const STAGE_COLORS = [
   'var(--column-blue)',
   'var(--column-amber)',
@@ -925,11 +945,86 @@ class NotionKanbanApp {
     });
   }
 
+  // Vuelca al objeto `task` lo que el usuario tiene escrito en el modal en este
+  // momento. Sin esto, cualquier re-render (agregar bloque, subir archivo, mover
+  // subtarea...) reconstruye el modal desde `task` y descarta lo no guardado.
+  captureDetailForm(task) {
+    if (!task || !this.detailModalBodyEl) return;
+    const body = this.detailModalBodyEl;
+    const valueOf = (id) => {
+      const el = body.querySelector(`#${id}`);
+      return el ? el.value : null;
+    };
+
+    const newName = valueOf('detail-task-name');
+    if (newName !== null && newName.trim()) task.name = newName.trim();
+
+    const newIcon = valueOf('detail-task-icon');
+    if (newIcon !== null) task.icon = newIcon.trim() || '📄';
+
+    const newPriority = valueOf('detail-task-priority');
+    if (newPriority !== null) task.priority = newPriority;
+
+    const newDeadline = valueOf('detail-task-deadline');
+    if (newDeadline !== null) task.date_deadline = newDeadline;
+
+    const newDesc = valueOf('detail-task-desc');
+    if (newDesc !== null) task.description = newDesc;
+
+    const newCover = valueOf('detail-task-cover');
+    if (newCover !== null) task.cover_image = newCover.trim();
+
+    const stageSel = body.querySelector('#detail-task-stage');
+    if (stageSel && stageSel.value) {
+      const stageObj = this.stages.find(s => Number(s.id) === Number(stageSel.value));
+      const fallbackName = Array.isArray(task.stage_id) ? task.stage_id[1] : 'Actualizado';
+      task.stage_id = [Number(stageSel.value), stageObj ? stageObj.name : fallbackName];
+    }
+
+    const chkAbelardo = body.querySelector('#chk-abelardo');
+    const chkRegina = body.querySelector('#chk-regina');
+    if (chkAbelardo || chkRegina) {
+      task.user_ids = [];
+      if (chkAbelardo && chkAbelardo.checked) task.user_ids.push({ id: 1, name: 'Abelardo', role: 'abelardo' });
+      if (chkRegina && chkRegina.checked) task.user_ids.push({ id: 2, name: 'Regina', role: 'regina' });
+    }
+
+    if (body.querySelector('.tag-chk')) {
+      task.tag_ids = [];
+      body.querySelectorAll('.tag-chk:checked').forEach(chk => {
+        task.tag_ids.push({
+          id: Number(chk.dataset.tagId),
+          name: chk.dataset.tagName,
+          color: chk.dataset.tagColor
+        });
+      });
+    }
+  }
+
+  // Re-dibuja el modal conservando lo que el usuario tenga escrito.
+  // `mutate` se ejecuta después de capturar el formulario, para que los cambios
+  // hechos por el handler (portada, adjuntos, bloques...) no se pisen.
+  refreshDetailModal(task, mutate) {
+    this.captureDetailForm(task);
+    if (typeof mutate === 'function') mutate();
+    odooClient.persistDemo();
+    this.openDetailModal(task);
+  }
+
   openDetailModal(task) {
+    // La etapa realmente persistida se recuerda solo mientras el modal siga
+    // abierto sobre la misma tarea, para no re-enviar el cambio a Odoo en cada
+    // re-render interno.
+    if (this._detailTaskId !== task.id) {
+      this._detailTaskId = task.id;
+      this._detailPersistedStageId = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
+    }
+    this._detailTask = task;
+
     const stageOptions = this.stages.map(s => {
       const currentStageId = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
       const selected = Number(s.id) === Number(currentStageId) ? 'selected' : '';
-      return `<option value="${s.id}" ${selected}>${s.name}</option>`;
+      return `<option value="${s.id}" ${selected}>${esc(s.name)}</option>`;
     }).join('');
 
     const isAbelardo = Array.isArray(task.user_ids) && task.user_ids.some(u => (u.name || '').includes('Abelardo'));
@@ -947,7 +1042,7 @@ class NotionKanbanApp {
 
     const renderSubCards = (items) => items.map((st) => `
       <div class="sub-kanban-card" draggable="true" data-sub-id="${st.id}">
-        <span class="sub-card-text" title="Haz clic para renombrar subtarea">${st.text}</span>
+        <span class="sub-card-text" title="Haz clic para renombrar subtarea">${esc(st.text)}</span>
         <button class="delete-sub-btn" data-sub-id="${st.id}" title="Eliminar subtarea (esquina superior derecha)">🗑️</button>
       </div>
     `).join('');
@@ -959,8 +1054,8 @@ class NotionKanbanApp {
       return `
         <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-subtle); padding: 4px 8px; border-radius: 14px; border: 1px solid var(--border-light);">
           <label style="cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-            <input type="checkbox" class="tag-chk" data-tag-id="${tag.id}" data-tag-name="${tag.name}" data-tag-color="${tag.color}" ${checked} />
-            <span class="tag-pill tag-${tag.color || 'blue'}">${tag.name}</span>
+            <input type="checkbox" class="tag-chk" data-tag-id="${tag.id}" data-tag-name="${esc(tag.name)}" data-tag-color="${esc(tag.color)}" ${checked} />
+            <span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>
           </label>
           <button type="button" class="edit-tag-btn icon-btn-subtle" data-tag-id="${tag.id}" title="Editar etiqueta" style="font-size: 10px; padding: 0 2px;">✏️</button>
           <button type="button" class="delete-tag-btn icon-btn-subtle" data-tag-id="${tag.id}" title="Eliminar etiqueta" style="font-size: 10px; padding: 0 2px;">🗑️</button>
@@ -971,12 +1066,12 @@ class NotionKanbanApp {
     const renderAttachments = Array.isArray(task.attachments) ? task.attachments.map(att => `
       <div class="attachment-card">
         ${att.isImage
-          ? `<img src="${att.url}" class="attachment-img-preview" alt="Attachment" />`
-          : `<div class="attachment-doc-badge">📄 ${att.name}</div>`
+          ? `<img src="${esc(att.url)}" class="attachment-img-preview" alt="Attachment" />`
+          : `<div class="attachment-doc-badge">📄 ${esc(att.name)}</div>`
         }
         <div class="attachment-footer">
-          <a href="${att.url}" target="_blank" style="color: var(--text-main); text-decoration:none;">Abrir</a>
-          ${att.isImage ? `<button type="button" class="set-cover-btn" data-url="${att.url}">Usar Portada</button>` : ''}
+          <a href="${esc(att.url)}" target="_blank" style="color: var(--text-main); text-decoration:none;">Abrir</a>
+          ${att.isImage ? `<button type="button" class="set-cover-btn" data-url="${esc(att.url)}">Usar Portada</button>` : ''}
         </div>
       </div>
     `).join('') : '';
@@ -1001,10 +1096,10 @@ class NotionKanbanApp {
                 </div>
               </div>
               <div class="notion-callout">
-                <input type="text" class="block-callout-icon" data-block-id="${blk.id}" value="${blk.icon || '💡'}" style="width:30px; font-size:18px; text-align:center; border:none; background:none;" />
+                <input type="text" class="block-callout-icon" data-block-id="${blk.id}" value="${esc(blk.icon || '💡')}" style="width:30px; font-size:18px; text-align:center; border:none; background:none;" />
                 <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-                  <input type="text" class="block-callout-title form-control" data-block-id="${blk.id}" value="${blk.title || ''}" placeholder="Título del destacado..." style="font-weight:700; font-size:13px;" />
-                  <textarea class="block-callout-text form-control" data-block-id="${blk.id}" rows="2" placeholder="Detalle o nota destacada...">${blk.text || ''}</textarea>
+                  <input type="text" class="block-callout-title form-control" data-block-id="${blk.id}" value="${esc(blk.title)}" placeholder="Título del destacado..." style="font-weight:700; font-size:13px;" />
+                  <textarea class="block-callout-text form-control" data-block-id="${blk.id}" rows="2" placeholder="Detalle o nota destacada...">${esc(blk.text)}</textarea>
                 </div>
               </div>
             </div>
@@ -1023,7 +1118,7 @@ class NotionKanbanApp {
                   <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
                 </div>
               </div>
-              <input type="text" class="block-table-title form-control" data-block-id="${blk.id}" value="${blk.title || 'Tabla de Métricas'}" style="font-weight:700; font-size:13px;" />
+              <input type="text" class="block-table-title form-control" data-block-id="${blk.id}" value="${esc(blk.title || 'Tabla de Métricas')}" style="font-weight:700; font-size:13px;" />
               <table class="notion-grid-table">
                 <thead>
                   <tr>
@@ -1036,10 +1131,10 @@ class NotionKanbanApp {
                 <tbody>
                   ${rows.map((r, rIdx) => `
                     <tr>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="0" value="${r[0] || ''}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="1" value="${r[1] || ''}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="2" value="${r[2] || ''}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="3" value="${r[3] || ''}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="0" value="${esc(r[0])}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="1" value="${esc(r[1])}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="2" value="${esc(r[2])}" style="font-size:12px;" /></td>
+                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="3" value="${esc(r[3])}" style="font-size:12px;" /></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1065,8 +1160,8 @@ class NotionKanbanApp {
                 <div class="notion-carousel-slider">
                   ${images.map(img => `
                     <div style="display:flex; flex-direction:column; gap:2px;">
-                      <img src="${img.url}" class="carousel-slide-item" alt="Slide" />
-                      <span style="font-size:10px; color:var(--text-muted); width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${img.name}</span>
+                      <img src="${esc(img.url)}" class="carousel-slide-item" alt="Slide" />
+                      <span style="font-size:10px; color:var(--text-muted); width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(img.name)}</span>
                     </div>
                   `).join('')}
                 </div>
@@ -1086,8 +1181,8 @@ class NotionKanbanApp {
                   <button type="button" class="delete-block-btn icon-btn-subtle" data-block-id="${blk.id}" style="color:#ef4444;">🗑️</button>
                 </div>
               </div>
-              <input type="text" class="block-note-title form-control" data-block-id="${blk.id}" value="${blk.title || ''}" placeholder="Título del bloque de notas..." style="font-weight:600; font-size:13px;" />
-              <textarea class="block-note-content form-control" data-block-id="${blk.id}" rows="3" placeholder="Escribe aquí notas adicionales, listas o minuta..." style="font-size:12px;">${blk.text || ''}</textarea>
+              <input type="text" class="block-note-title form-control" data-block-id="${blk.id}" value="${esc(blk.title)}" placeholder="Título del bloque de notas..." style="font-weight:600; font-size:13px;" />
+              <textarea class="block-note-content form-control" data-block-id="${blk.id}" rows="3" placeholder="Escribe aquí notas adicionales, listas o minuta..." style="font-size:12px;">${esc(blk.text)}</textarea>
             </div>
           `;
         }
@@ -1098,7 +1193,7 @@ class NotionKanbanApp {
 
     const hasCover = Boolean(task.cover_image);
     const coverBannerHtml = hasCover ? `
-      <div class="modal-cover-banner" style="background-image: url('${task.cover_image}');">
+      <div class="modal-cover-banner" style="background-image: url('${esc(task.cover_image)}');">
         <div class="cover-banner-overlay">
           <button type="button" id="upload-cover-direct-btn" class="btn btn-sm btn-primary" style="padding: 4px 10px; font-size: 11px;">📷 Cambiar Portada</button>
           <button type="button" id="remove-cover-btn" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;">🗑️ Quitar Portada</button>
@@ -1114,7 +1209,7 @@ class NotionKanbanApp {
           <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">Elegir de imágenes adjuntas:</span>
           <div class="cover-quick-picker">
             ${imageAttachments.map(att => `
-              <img src="${att.url}" class="cover-thumb-option ${task.cover_image === att.url ? 'active' : ''}" data-url="${att.url}" title="Establecer ${att.name} como portada" />
+              <img src="${esc(att.url)}" class="cover-thumb-option ${task.cover_image === att.url ? 'active' : ''}" data-url="${esc(att.url)}" title="Establecer ${esc(att.name)} como portada" />
             `).join('')}
           </div>
         </div>
@@ -1130,11 +1225,11 @@ class NotionKanbanApp {
       <div style="display: flex; gap: 8px; align-items: flex-end;">
         <div class="form-group" style="width: 70px;">
           <label>Icono</label>
-          <input type="text" id="detail-task-icon" class="form-control" value="${task.icon || '📄'}" style="text-align: center; font-size: 18px;" />
+          <input type="text" id="detail-task-icon" class="form-control" value="${esc(task.icon || '📄')}" style="text-align: center; font-size: 18px;" />
         </div>
         <div class="form-group" style="flex: 1;">
           <label>Título de la Tarea / Proyecto</label>
-          <input type="text" id="detail-task-name" class="form-control" value="${task.name}" style="font-size: 16px; font-weight: 600;" />
+          <input type="text" id="detail-task-name" class="form-control" value="${esc(task.name)}" style="font-size: 16px; font-weight: 600;" />
         </div>
       </div>
 
@@ -1213,7 +1308,7 @@ class NotionKanbanApp {
         ${quickPickerHtml}
 
         <div style="margin-top: 8px;">
-          <input type="url" id="detail-task-cover" class="form-control" value="${task.cover_image || ''}" placeholder="O pega un enlace directo URL (https://...)" style="font-size: 12px;" />
+          <input type="url" id="detail-task-cover" class="form-control" value="${esc(task.cover_image)}" placeholder="O pega un enlace directo URL (https://...)" style="font-size: 12px;" />
         </div>
       </div>
 
@@ -1293,7 +1388,7 @@ class NotionKanbanApp {
 
       <div class="form-group" style="margin-top:10px;">
         <label>Contenido / Minuta de la Bitácora</label>
-        <textarea id="detail-task-desc" class="form-control" rows="5" style="resize: vertical; font-family: monospace; font-size: 12px;">${task.description || ''}</textarea>
+        <textarea id="detail-task-desc" class="form-control" rows="5" style="resize: vertical; font-family: monospace; font-size: 12px;">${esc(task.description)}</textarea>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
@@ -1321,9 +1416,9 @@ class NotionKanbanApp {
           const finalColor = validColors.includes((colorOpt || '').toLowerCase().trim()) ? colorOpt.toLowerCase().trim() : 'blue';
           
           const tags = getAvailableTags();
-          tags.push({ id: Date.now(), name: tagName.trim(), color: finalColor });
+          tags.push({ id: uid(), name: tagName.trim(), color: finalColor });
           saveAvailableTags(tags);
-          this.openDetailModal(task);
+          this.refreshDetailModal(task);
         }
       });
     }
@@ -1342,7 +1437,7 @@ class NotionKanbanApp {
           targetTag.name = newName.trim();
           if (newColor && newColor.trim()) targetTag.color = newColor.trim();
           saveAvailableTags(tags);
-          this.openDetailModal(task);
+          this.refreshDetailModal(task);
         }
       });
     });
@@ -1354,9 +1449,9 @@ class NotionKanbanApp {
         let tags = getAvailableTags();
         tags = tags.filter(t => Number(t.id) !== tagId);
         saveAvailableTags(tags);
-        task.tag_ids = task.tag_ids.filter(t => Number(t.id) !== tagId);
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        this.refreshDetailModal(task, () => {
+          task.tag_ids = task.tag_ids.filter(t => Number(t.id) !== tagId);
+        });
       });
     });
 
@@ -1392,11 +1487,9 @@ class NotionKanbanApp {
 
           const saveSubText = () => {
             const newText = input.value.trim();
-            if (newText) {
-              subObj.text = newText;
-              odooClient.persistDemo();
-            }
-            this.openDetailModal(task);
+            this.refreshDetailModal(task, () => {
+              if (newText) subObj.text = newText;
+            });
           };
 
           input.addEventListener('blur', saveSubText);
@@ -1426,10 +1519,10 @@ class NotionKanbanApp {
 
         const sub = task.subtasks.find(s => String(s.id) === String(this.draggedSubtaskId));
         if (sub) {
-          sub.status = targetStatus;
-          sub.completed = (targetStatus === 'done');
-          odooClient.persistDemo();
-          this.openDetailModal(task);
+          this.refreshDetailModal(task, () => {
+            sub.status = targetStatus;
+            sub.completed = (targetStatus === 'done');
+          });
         }
       });
     });
@@ -1449,7 +1542,7 @@ class NotionKanbanApp {
             alert('Error subiendo archivo: ' + err.message);
           }
         }
-        this.openDetailModal(task);
+        this.refreshDetailModal(task);
       });
     }
 
@@ -1468,9 +1561,7 @@ class NotionKanbanApp {
         if (file) {
           try {
             const url = await this.handleFileUpload(file, task);
-            task.cover_image = url;
-            odooClient.persistDemo();
-            this.openDetailModal(task);
+            this.refreshDetailModal(task, () => { task.cover_image = url; });
           } catch (err) {
             alert('Error subiendo imagen de portada: ' + err.message);
           }
@@ -1480,27 +1571,21 @@ class NotionKanbanApp {
 
     if (removeCoverBtn) {
       removeCoverBtn.addEventListener('click', () => {
-        task.cover_image = '';
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        this.refreshDetailModal(task, () => { task.cover_image = ''; });
       });
     }
 
     this.detailModalBodyEl.querySelectorAll('.cover-thumb-option').forEach(thumb => {
       thumb.addEventListener('click', (e) => {
         const url = e.target.dataset.url;
-        task.cover_image = url;
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        this.refreshDetailModal(task, () => { task.cover_image = url; });
       });
     });
 
     this.detailModalBodyEl.querySelectorAll('.set-cover-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const coverUrl = e.target.dataset.url;
-        task.cover_image = coverUrl;
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        this.refreshDetailModal(task, () => { task.cover_image = coverUrl; });
       });
     });
 
@@ -1512,14 +1597,13 @@ class NotionKanbanApp {
         if (!subToDelete) return;
 
         const subIndex = task.subtasks.findIndex(s => String(s.id) === String(subId));
-        task.subtasks = task.subtasks.filter(s => String(s.id) !== String(subId));
 
-        this.pushUndoAction(`Subtarea "${subToDelete.text}" eliminada`, () => {
-          task.subtasks.splice(subIndex, 0, subToDelete);
+        this.refreshDetailModal(task, () => {
+          task.subtasks.splice(subIndex, 1);
+          this.pushUndoAction(`Subtarea "${subToDelete.text}" eliminada`, () => {
+            task.subtasks.splice(subIndex, 0, subToDelete);
+          });
         });
-
-        odooClient.persistDemo();
-        this.openDetailModal(task);
       });
     });
 
@@ -1529,9 +1613,9 @@ class NotionKanbanApp {
         const input = document.getElementById('new-subtask-input');
         const val = input ? input.value.trim() : '';
         if (val) {
-          task.subtasks.push({ id: Date.now(), text: val, status: 'todo', completed: false });
-          odooClient.persistDemo();
-          this.openDetailModal(task);
+          this.refreshDetailModal(task, () => {
+            task.subtasks.push({ id: uid(), text: val, status: 'todo', completed: false });
+          });
         }
       });
     }
@@ -1541,65 +1625,40 @@ class NotionKanbanApp {
       delTaskBtn.addEventListener('click', () => {
         const taskToBackup = JSON.parse(JSON.stringify(task));
         const taskIndex = this.tasks.findIndex(t => String(t.id) === String(task.id));
+        if (taskIndex === -1) return;
 
-        this.tasks = this.tasks.filter(t => String(t.id) !== String(task.id));
+        // Se muta el arreglo en su lugar: `this.tasks` es la MISMA referencia que
+        // odooClient.demoTasks. Reasignarla con .filter() rompía el vínculo y el
+        // persistDemo() siguiente volvía a guardar la tarea recién borrada.
+        this.tasks.splice(taskIndex, 1);
 
         this.pushUndoAction(`Tarea "${task.name}" eliminada`, () => {
           this.tasks.splice(taskIndex, 0, taskToBackup);
         });
 
+        this._detailTaskDeleted = true;
         odooClient.persistDemo();
         this.closeDetailModal();
-        this.renderCurrentView();
       });
     }
 
     const saveDetailBtn = document.getElementById('save-detail-btn');
     if (saveDetailBtn) {
       saveDetailBtn.addEventListener('click', async () => {
-        const newName = document.getElementById('detail-task-name').value.trim();
-        const newIcon = document.getElementById('detail-task-icon').value.trim();
-        const newStageId = document.getElementById('detail-task-stage').value;
-        const newPriority = document.getElementById('detail-task-priority').value;
-        const newDeadline = document.getElementById('detail-task-deadline').value;
-        const newDesc = document.getElementById('detail-task-desc').value.trim();
-        const newCover = document.getElementById('detail-task-cover').value.trim();
+        // Mismo volcado que usan los re-renders internos: título, icono, etapa,
+        // prioridad, fecha, minuta, portada, socios y etiquetas.
+        this.captureDetailForm(task);
 
-        const selAbelardo = document.getElementById('chk-abelardo').checked;
-        const selRegina = document.getElementById('chk-regina').checked;
+        const newStageId = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
+        const stageName = Array.isArray(task.stage_id) ? task.stage_id[1] : 'Actualizado';
 
-        task.user_ids = [];
-        if (selAbelardo) task.user_ids.push({ id: 1, name: 'Abelardo', role: 'abelardo' });
-        if (selRegina) task.user_ids.push({ id: 2, name: 'Regina', role: 'regina' });
-
-        task.tag_ids = [];
-        this.detailModalBodyEl.querySelectorAll('.tag-chk:checked').forEach(chk => {
-          task.tag_ids.push({
-            id: Number(chk.dataset.tagId),
-            name: chk.dataset.tagName,
-            color: chk.dataset.tagColor
-          });
-        });
-
-        const stageObj = this.stages.find(s => Number(s.id) === Number(newStageId));
-        const stageName = stageObj ? stageObj.name : 'Actualizado';
-
-        task.name = newName;
-        task.icon = newIcon || '📄';
-        task.priority = newPriority;
-        task.date_deadline = newDeadline;
-        task.description = newDesc;
-        task.cover_image = newCover;
-
-        const currentStageId = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
-        if (Number(currentStageId) !== Number(newStageId)) {
-          task.stage_id = [Number(newStageId), stageName];
+        if (Number(this._detailPersistedStageId) !== Number(newStageId)) {
           await odooClient.updateTaskStage(task.id, newStageId, stageName);
+          this._detailPersistedStageId = newStageId;
         }
 
         odooClient.persistDemo();
         this.closeDetailModal();
-        this.renderCurrentView();
       });
     }
 
@@ -1607,34 +1666,36 @@ class NotionKanbanApp {
     this.detailModalBodyEl.querySelectorAll('.add-block-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const type = btn.dataset.type;
-        if (type === 'callout') {
-          task.blocks.push({ id: Date.now(), type: 'callout', icon: '💡', title: 'IMPORTANTE / NOTA', text: '', color: 'yellow' });
-        } else if (type === 'table') {
-          task.blocks.push({
-            id: Date.now(),
-            type: 'table',
-            title: 'Tabla de Métricas',
-            rows: [
-              ['Métrica 1', '100', '100', '150'],
-              ['Métrica 2', '$10k', '$10k', '$15k']
-            ]
-          });
-        } else if (type === 'carousel') {
-          task.blocks.push({ id: Date.now(), type: 'carousel' });
-        } else if (type === 'note') {
-          task.blocks.push({ id: Date.now(), type: 'note', title: 'Nota de Trabajo', text: '' });
-        }
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        this.refreshDetailModal(task, () => {
+          if (type === 'callout') {
+            task.blocks.push({ id: uid(), type: 'callout', icon: '💡', title: 'IMPORTANTE / NOTA', text: '', color: 'yellow' });
+          } else if (type === 'table') {
+            task.blocks.push({
+              id: uid(),
+              type: 'table',
+              title: 'Tabla de Métricas',
+              rows: [
+                ['Métrica 1', '100', '100', '150'],
+                ['Métrica 2', '$10k', '$10k', '$15k']
+              ]
+            });
+          } else if (type === 'carousel') {
+            task.blocks.push({ id: uid(), type: 'carousel' });
+          } else if (type === 'note') {
+            task.blocks.push({ id: uid(), type: 'note', title: 'Nota de Trabajo', text: '' });
+          }
+        });
       });
     });
 
     this.detailModalBodyEl.querySelectorAll('.delete-block-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const blockId = Number(e.target.dataset.blockId);
-        task.blocks = task.blocks.filter(b => Number(b.id) !== blockId);
-        odooClient.persistDemo();
-        this.openDetailModal(task);
+        const blockIdx = task.blocks.findIndex(b => Number(b.id) === blockId);
+        if (blockIdx === -1) return;
+        // Se borra por índice, no con filter(): así un id repetido nunca arrastra
+        // a otro bloque junto con el que sí se pidió eliminar.
+        this.refreshDetailModal(task, () => { task.blocks.splice(blockIdx, 1); });
       });
     });
 
@@ -1642,11 +1703,11 @@ class NotionKanbanApp {
       btn.addEventListener('click', (e) => {
         const idx = Number(e.target.dataset.idx);
         if (idx > 0) {
-          const temp = task.blocks[idx];
-          task.blocks[idx] = task.blocks[idx - 1];
-          task.blocks[idx - 1] = temp;
-          odooClient.persistDemo();
-          this.openDetailModal(task);
+          this.refreshDetailModal(task, () => {
+            const temp = task.blocks[idx];
+            task.blocks[idx] = task.blocks[idx - 1];
+            task.blocks[idx - 1] = temp;
+          });
         }
       });
     });
@@ -1655,11 +1716,11 @@ class NotionKanbanApp {
       btn.addEventListener('click', (e) => {
         const idx = Number(e.target.dataset.idx);
         if (idx < task.blocks.length - 1) {
-          const temp = task.blocks[idx];
-          task.blocks[idx] = task.blocks[idx + 1];
-          task.blocks[idx + 1] = temp;
-          odooClient.persistDemo();
-          this.openDetailModal(task);
+          this.refreshDetailModal(task, () => {
+            const temp = task.blocks[idx];
+            task.blocks[idx] = task.blocks[idx + 1];
+            task.blocks[idx + 1] = temp;
+          });
         }
       });
     });
@@ -1669,71 +1730,54 @@ class NotionKanbanApp {
         const blockId = Number(e.target.dataset.blockId);
         const blk = task.blocks.find(b => Number(b.id) === blockId);
         if (blk) {
-          if (!Array.isArray(blk.rows)) blk.rows = [];
-          blk.rows.push(['', '', '', '']);
-          odooClient.persistDemo();
-          this.openDetailModal(task);
+          this.refreshDetailModal(task, () => {
+            if (!Array.isArray(blk.rows)) blk.rows = [];
+            blk.rows.push(['', '', '', '']);
+          });
         }
       });
     });
 
-    this.detailModalBodyEl.querySelectorAll('.block-callout-title').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        if (blk) blk.title = e.target.value;
+    // Enlaza cada input de bloque con su campo. `.block-callout-icon` estaba
+    // renderizado pero sin listener, así que el emoji nunca se guardaba.
+    const bindBlockField = (selector, apply) => {
+      this.detailModalBodyEl.querySelectorAll(selector).forEach(input => {
+        input.addEventListener('input', (e) => {
+          const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
+          if (blk) apply(blk, e.target);
+        });
+        input.addEventListener('change', () => odooClient.persistDemo());
       });
-      input.addEventListener('change', () => odooClient.persistDemo());
-    });
+    };
 
-    this.detailModalBodyEl.querySelectorAll('.block-callout-text').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        if (blk) blk.text = e.target.value;
-      });
-      input.addEventListener('change', () => odooClient.persistDemo());
-    });
-
-    this.detailModalBodyEl.querySelectorAll('.block-table-title').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        if (blk) blk.title = e.target.value;
-      });
-      input.addEventListener('change', () => odooClient.persistDemo());
-    });
-
-    this.detailModalBodyEl.querySelectorAll('.grid-cell-input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        const rIdx = Number(e.target.dataset.row);
-        const cIdx = Number(e.target.dataset.col);
-        if (blk && blk.rows && blk.rows[rIdx]) {
-          blk.rows[rIdx][cIdx] = e.target.value;
-        }
-      });
-      input.addEventListener('change', () => odooClient.persistDemo());
-    });
-
-    this.detailModalBodyEl.querySelectorAll('.block-note-title').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        if (blk) blk.title = e.target.value;
-      });
-      input.addEventListener('change', () => odooClient.persistDemo());
-    });
-
-    this.detailModalBodyEl.querySelectorAll('.block-note-content').forEach(input => {
-      input.addEventListener('input', (e) => {
-        const blk = task.blocks.find(b => Number(b.id) === Number(e.target.dataset.blockId));
-        if (blk) blk.text = e.target.value;
-      });
-      input.addEventListener('change', () => odooClient.persistDemo());
+    bindBlockField('.block-callout-icon', (blk, el) => { blk.icon = el.value.trim() || '💡'; });
+    bindBlockField('.block-callout-title', (blk, el) => { blk.title = el.value; });
+    bindBlockField('.block-callout-text', (blk, el) => { blk.text = el.value; });
+    bindBlockField('.block-table-title', (blk, el) => { blk.title = el.value; });
+    bindBlockField('.block-note-title', (blk, el) => { blk.title = el.value; });
+    bindBlockField('.block-note-content', (blk, el) => { blk.text = el.value; });
+    bindBlockField('.grid-cell-input', (blk, el) => {
+      const rIdx = Number(el.dataset.row);
+      const cIdx = Number(el.dataset.col);
+      if (Array.isArray(blk.rows) && blk.rows[rIdx]) blk.rows[rIdx][cIdx] = el.value;
     });
 
     this.detailModalEl.classList.add('active');
   }
 
   closeDetailModal() {
+    // Cerrar con la ✕ o clic fuera ya no descarta lo escrito: se guarda igual
+    // que con "Guardar Cambios" (salvo la etapa, que sí requiere el botón).
+    if (this._detailTask && !this._detailTaskDeleted) {
+      this.captureDetailForm(this._detailTask);
+      odooClient.persistDemo();
+    }
+
+    this._detailTask = null;
+    this._detailTaskId = null;
+    this._detailTaskDeleted = false;
     this.detailModalEl.classList.remove('active');
+    this.renderCurrentView();
   }
 }
 

@@ -29,17 +29,41 @@ class OdooApiClient {
       storedTasks = null;
     }
 
-    const hasDesignarCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'designar' || t.name === 'Mercado Libre');
-    const hasPenseEnTiCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'pense_en_ti' || t.name === 'Inventario de la tienda');
-    const hasVentasCards = Array.isArray(storedTasks) && storedTasks.some(t => t.projectId === 'ventas');
-
-    if (storedVersion !== DATA_VERSION || !hasDesignarCards || !hasPenseEnTiCards || !hasVentasCards) {
+    if (storedVersion !== DATA_VERSION || !Array.isArray(storedTasks) || storedTasks.length === 0) {
       console.log(`⚡ Resetting cache to fresh Notion tasks (version: ${DATA_VERSION})...`);
       this.demoTasks = JSON.parse(JSON.stringify(initialMockTasks));
       localStorage.setItem('notion_data_version', DATA_VERSION);
       this.persistDemo();
     } else {
       this.demoTasks = storedTasks;
+      // Non-destructive top-up: if a whole seeded board is gone, re-seed just that
+      // board instead of wiping the cache and destroying work on the other boards.
+      this.seedMissingProjects();
+    }
+  }
+
+  // Re-inserts the seed tasks of any project the user no longer has any card for.
+  // Never deletes or overwrites existing tasks.
+  seedMissingProjects() {
+    const seededProjects = [...new Set(initialMockTasks.map(t => t.projectId).filter(Boolean))];
+    const existingIds = new Set(this.demoTasks.map(t => String(t.id)));
+    let added = 0;
+
+    seededProjects.forEach(projectId => {
+      if (this.demoTasks.some(t => t.projectId === projectId)) return;
+
+      initialMockTasks
+        .filter(t => t.projectId === projectId && !existingIds.has(String(t.id)))
+        .forEach(t => {
+          this.demoTasks.push(JSON.parse(JSON.stringify(t)));
+          existingIds.add(String(t.id));
+          added++;
+        });
+    });
+
+    if (added > 0) {
+      console.log(`⚡ Re-seeded ${added} tareas de tableros vacíos sin borrar las existentes.`);
+      this.persistDemo();
     }
   }
 
