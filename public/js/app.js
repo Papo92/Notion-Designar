@@ -43,6 +43,18 @@ function uid() {
   return __lastUid;
 }
 
+// Compara por día LOCAL. `new Date('2026-07-31')` se interpreta como medianoche
+// UTC, que en UTC-6 ya es pasado: una tarea que vence hoy salía como atrasada.
+function isOverdue(dateStr) {
+  if (!dateStr) return false;
+  const parts = String(dateStr).split('-').map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) return false;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return new Date(parts[0], parts[1] - 1, parts[2]) < hoy;
+}
+
 const STAGE_COLORS = [
   'var(--column-blue)',
   'var(--column-amber)',
@@ -263,8 +275,21 @@ class NotionKanbanApp {
 
     if (this.newCardBtnEl) {
       this.newCardBtnEl.addEventListener('click', () => {
-        if (this.stages.length > 0) {
-          this.promptNewCard(this.stages[0].id, this.stages[0].name);
+        if (this.stages.length === 0) return;
+
+        // El formulario rápido se inserta DENTRO de una columna del tablero.
+        // Antes se llamaba sin `colEl`, así que quedaba fuera del DOM y el botón
+        // no hacía nada visible. Desde Tabla o Galería hay que volver al Kanban.
+        if (this.currentViewMode !== 'board') {
+          this.currentViewMode = 'board';
+          localStorage.setItem('notion_active_view', 'board');
+          this.viewTabs.forEach(t => t.classList.toggle('active', t.dataset.view === 'board'));
+          this.renderCurrentView();
+        }
+
+        const firstCol = this.boardEl.querySelector('.kanban-column');
+        if (firstCol) {
+          this.promptNewCard(Number(firstCol.dataset.stageId), firstCol.dataset.stageName, firstCol);
         }
       });
     }
@@ -328,7 +353,7 @@ class NotionKanbanApp {
         return Array.isArray(t.user_ids) && t.user_ids.length > 1;
       }
       if (this.activePartnerFilter === 'urgent') {
-        return Number(t.priority) >= 2 || (t.date_deadline && new Date(t.date_deadline) < new Date());
+        return Number(t.priority) >= 2 || isOverdue(t.date_deadline);
       }
 
       return true;
@@ -377,8 +402,8 @@ class NotionKanbanApp {
       colEl.innerHTML = `
         <div class="column-header">
           <div class="column-title-group">
-            <span class="column-color-indicator" style="background-color: ${stage.color};" title="Haz clic para cambiar color de la columna"></span>
-            <span class="column-title" title="Haz clic para renombrar la columna">${stage.name}</span>
+            <span class="column-color-indicator" style="background-color: ${esc(stage.color)};" title="Haz clic para cambiar color de la columna"></span>
+            <span class="column-title" title="Haz clic para renombrar la columna">${esc(stage.name)}</span>
             <span class="column-count">${stageTasks.length}</span>
           </div>
           <div class="column-actions">
@@ -402,6 +427,7 @@ class NotionKanbanApp {
         const currentIdx = STAGE_COLORS.indexOf(stage.color);
         const nextIdx = (currentIdx + 1) % STAGE_COLORS.length;
         stage.color = STAGE_COLORS[nextIdx];
+        odooClient.persistStages();
         this.renderBoardView();
       });
 
@@ -413,6 +439,7 @@ class NotionKanbanApp {
           const temp = this.stages[idx];
           this.stages[idx] = this.stages[idx - 1];
           this.stages[idx - 1] = temp;
+          odooClient.persistStages();
           this.renderBoardView();
         });
       }
@@ -422,6 +449,7 @@ class NotionKanbanApp {
           const temp = this.stages[idx];
           this.stages[idx] = this.stages[idx + 1];
           this.stages[idx + 1] = temp;
+          odooClient.persistStages();
           this.renderBoardView();
         });
       }
@@ -449,15 +477,20 @@ class NotionKanbanApp {
           }
         });
 
-        this.stages = this.stages.filter(s => Number(s.id) !== Number(stage.id));
+        // Se muta en su lugar: this.stages es la MISMA referencia que
+        // odooClient.demoStages[proyecto]. Reasignarla con filter() rompía el
+        // vínculo y el borrado no llegaba a guardarse.
+        this.stages.splice(originalIndex, 1);
 
         this.pushUndoAction(`Columna "${stage.name}" eliminada`, () => {
           this.stages.splice(originalIndex, 0, stageToBackup);
           affectedTasks.forEach(item => {
             item.task.stage_id = item.origStageId;
           });
+          odooClient.persistStages();
         });
 
+        odooClient.persistStages();
         odooClient.persistDemo();
         this.renderBoardView();
       });
@@ -477,6 +510,13 @@ class NotionKanbanApp {
           const newName = input.value.trim();
           if (newName && newName !== currentTitle) {
             stage.name = newName;
+            // El nombre de la etapa está denormalizado en cada tarea.
+            this.tasks.forEach(t => {
+              const tStageId = Array.isArray(t.stage_id) ? t.stage_id[0] : t.stage_id;
+              if (Number(tStageId) === Number(stage.id)) t.stage_id = [Number(stage.id), newName];
+            });
+            odooClient.persistStages();
+            odooClient.persistDemo();
           }
           this.renderBoardView();
         };
@@ -505,6 +545,37 @@ class NotionKanbanApp {
       this.boardEl.appendChild(colEl);
     });
 
+    // Red de seguridad: si una tarea apunta a una etapa que ya no existe, el
+    // bucle de arriba nunca la dibuja y desaparece del tablero en silencio.
+    // Se agrupan en una columna aparte desde la que se pueden arrastrar de vuelta.
+    const stageIds = new Set(this.stages.map(s => Number(s.id)));
+    const orphanTasks = filteredTasks.filter(t => {
+      const tStageId = Array.isArray(t.stage_id) ? t.stage_id[0] : t.stage_id;
+      return !stageIds.has(Number(tStageId));
+    });
+
+    if (orphanTasks.length > 0) {
+      const orphanCol = document.createElement('div');
+      orphanCol.className = 'kanban-column';
+      orphanCol.innerHTML = `
+        <div class="column-header">
+          <div class="column-title-group">
+            <span class="column-color-indicator" style="background-color: var(--column-pink);"></span>
+            <span class="column-title" title="Estas tarjetas quedaron sin columna">⚠️ Sin etapa</span>
+            <span class="column-count">${orphanTasks.length}</span>
+          </div>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); padding:0 4px 8px;">
+          Su columna original ya no existe. Arrástralas a la columna que corresponda.
+        </div>
+        <div class="cards-container"></div>
+      `;
+
+      const orphanContainer = orphanCol.querySelector('.cards-container');
+      orphanTasks.forEach(task => orphanContainer.appendChild(this.createCardElement(task)));
+      this.boardEl.appendChild(orphanCol);
+    }
+
     const addColBtn = document.createElement('button');
     addColBtn.className = 'add-column-btn';
     addColBtn.innerHTML = `<span>+ Añadir Nueva Columna</span>`;
@@ -512,12 +583,13 @@ class NotionKanbanApp {
       const colName = prompt('Nombre de la nueva columna / etapa:');
       if (colName && colName.trim()) {
         const newStage = {
-          id: Date.now(),
+          id: uid(),
           name: colName.trim(),
           sequence: (this.stages.length + 1) * 10,
           color: 'var(--column-purple)'
         };
         this.stages.push(newStage);
+        odooClient.persistStages();
         this.renderBoardView();
       }
     });
@@ -566,12 +638,12 @@ class NotionKanbanApp {
 
       let tagsText = '';
       if (Array.isArray(t.tag_ids)) {
-        tagsText = t.tag_ids.map(tag => `<span class="tag-pill tag-${tag.color || 'blue'}">${tag.name}</span>`).join(' ');
+        tagsText = t.tag_ids.map(tag => `<span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>`).join(' ');
       }
 
       tr.innerHTML = `
-        <td style="font-weight: 500;">${t.icon || '📄'} ${t.name}</td>
-        <td><span class="status-badge">${stageName}</span></td>
+        <td style="font-weight: 500;">${esc(t.icon || '📄')} ${esc(t.name)}</td>
+        <td><span class="status-badge">${esc(stageName)}</span></td>
         <td>
           <div class="card-progress-wrapper" style="width: 100px;">
             <div class="progress-track"><div class="progress-fill ${percent === 100 ? 'complete' : ''}" style="width: ${percent}%;"></div></div>
@@ -579,8 +651,8 @@ class NotionKanbanApp {
           </div>
         </td>
         <td>${priorityText}</td>
-        <td>${socios}</td>
-        <td>${t.date_deadline || '-'}</td>
+        <td>${esc(socios)}</td>
+        <td>${esc(t.date_deadline || '-')}</td>
         <td>${tagsText}</td>
       `;
 
@@ -603,20 +675,20 @@ class NotionKanbanApp {
       const percent = this.calculateProgress(t);
 
       const imgHtml = t.cover_image
-        ? `<img src="${t.cover_image}" class="gallery-card-img" alt="Cover" />`
-        : `<div class="gallery-card-img" style="display:flex; align-items:center; justify-content:center; color:var(--text-light); font-size:32px;">${t.icon || '📝'}</div>`;
+        ? `<img src="${esc(t.cover_image)}" class="gallery-card-img" alt="Cover" />`
+        : `<div class="gallery-card-img" style="display:flex; align-items:center; justify-content:center; color:var(--text-light); font-size:32px;">${esc(t.icon || '📝')}</div>`;
 
       let tagsHtml = '';
       if (Array.isArray(t.tag_ids) && t.tag_ids.length > 0) {
         tagsHtml = `<div class="card-tags" style="margin-top:8px;">` +
-          t.tag_ids.map(tag => `<span class="tag-pill tag-${tag.color || 'blue'}">${tag.name}</span>`).join('') +
+          t.tag_ids.map(tag => `<span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>`).join('') +
         `</div>`;
       }
 
       cardEl.innerHTML = `
         ${imgHtml}
         <div class="gallery-card-body">
-          <div class="card-title">${t.icon || ''} ${t.name}</div>
+          <div class="card-title">${esc(t.icon || '')} ${esc(t.name)}</div>
           <div class="card-progress-wrapper">
             <div class="progress-track"><div class="progress-fill ${percent === 100 ? 'complete' : ''}" style="width: ${percent}%;"></div></div>
             <span class="progress-label">${percent}%</span>
@@ -638,13 +710,13 @@ class NotionKanbanApp {
 
     let coverHtml = '';
     if (task.cover_image) {
-      coverHtml = `<img src="${task.cover_image}" class="card-cover" alt="Cover Image" />`;
+      coverHtml = `<img src="${esc(task.cover_image)}" class="card-cover" alt="Cover Image" />`;
     }
 
     let tagsHtml = '';
     if (Array.isArray(task.tag_ids) && task.tag_ids.length > 0) {
       tagsHtml = `<div class="card-tags">` +
-        task.tag_ids.map(tag => `<span class="tag-pill tag-${tag.color || 'blue'}">${tag.name}</span>`).join('') +
+        task.tag_ids.map(tag => `<span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>`).join('') +
       `</div>`;
     }
 
@@ -661,7 +733,7 @@ class NotionKanbanApp {
     let priorityHtml = '';
     if (Number(task.priority) > 0) {
       const stars = Number(task.priority) === 2 ? '🚨 Urgencia' : '★ Alta';
-      priorityHtml = `<span class="priority-star" title="Prioridad: ${task.priority}">${stars}</span>`;
+      priorityHtml = `<span class="priority-star" title="Prioridad: ${esc(task.priority)}">${stars}</span>`;
     }
 
     let partnerBadgesHtml = '';
@@ -690,15 +762,14 @@ class NotionKanbanApp {
 
     let deadlineHtml = '';
     if (task.date_deadline) {
-      const isOverdue = new Date(task.date_deadline) < new Date();
-      deadlineHtml = `<div class="deadline-pill ${isOverdue ? 'overdue' : ''}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${task.date_deadline}</div>`;
+      deadlineHtml = `<div class="deadline-pill ${isOverdue(task.date_deadline) ? 'overdue' : ''}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${task.date_deadline}</div>`;
     }
 
     cardEl.innerHTML = `
       ${coverHtml}
       ${tagsHtml}
       <div class="card-title-row">
-        <div class="card-title">${task.icon || ''} ${task.name}</div>
+        <div class="card-title">${esc(task.icon || '')} ${esc(task.name)}</div>
         <span class="edit-title-icon" title="Renombrar tarjeta inline">✏️</span>
       </div>
       ${progressBarHtml}

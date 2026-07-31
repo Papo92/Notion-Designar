@@ -17,7 +17,6 @@ class OdooApiClient {
 
     this.sessionId = localStorage.getItem('odoo_session_id') || null;
     this.uid = localStorage.getItem('odoo_uid') || null;
-    this.demoStages = initialMockStages;
 
     // Strict Cache Invalidation & Task Verification
     const storedVersion = localStorage.getItem('notion_data_version');
@@ -28,6 +27,8 @@ class OdooApiClient {
     } catch (e) {
       storedTasks = null;
     }
+
+    this.demoStages = this.loadStages(storedVersion === DATA_VERSION);
 
     if (storedVersion !== DATA_VERSION || !Array.isArray(storedTasks) || storedTasks.length === 0) {
       console.log(`⚡ Resetting cache to fresh Notion tasks (version: ${DATA_VERSION})...`);
@@ -42,6 +43,38 @@ class OdooApiClient {
       // board instead of wiping the cache and destroying work on the other boards.
       this.seedMissingProjects();
     }
+  }
+
+  // Carga las etapas (columnas) guardadas por el usuario. Antes solo vivían en
+  // memoria: renombrar, recolorear, reordenar, añadir o borrar una columna se
+  // perdía al recargar, y las tarjetas movidas a una columna nueva quedaban
+  // huérfanas e invisibles en el Kanban.
+  loadStages(versionOk) {
+    const base = JSON.parse(JSON.stringify(initialMockStages));
+    if (!versionOk) return base;
+
+    let stored = null;
+    try {
+      stored = JSON.parse(localStorage.getItem('notion_demo_stages'));
+    } catch (e) {
+      stored = null;
+    }
+
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return base;
+
+    // Se conserva lo guardado y se rellenan los proyectos que aún no tengan
+    // columnas propias (por ejemplo, uno recién añadido a mockData.js).
+    Object.keys(base).forEach(projectId => {
+      if (!Array.isArray(stored[projectId]) || stored[projectId].length === 0) {
+        stored[projectId] = base[projectId];
+      }
+    });
+
+    return stored;
+  }
+
+  persistStages() {
+    localStorage.setItem('notion_demo_stages', JSON.stringify(this.demoStages));
   }
 
   // Elimina tarjetas con id repetido conservando la primera aparición.
@@ -312,8 +345,10 @@ class OdooApiClient {
   }
 
   resetDemo() {
-    this.demoStages = initialMockStages;
+    // Copia profunda: mutar initialMockStages contaminaba el módulo importado.
+    this.demoStages = JSON.parse(JSON.stringify(initialMockStages));
     this.demoTasks = JSON.parse(JSON.stringify(initialMockTasks));
+    this.persistStages();
     this.persistDemo();
   }
 }

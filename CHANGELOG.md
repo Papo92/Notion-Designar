@@ -147,3 +147,53 @@ Este documento registra de forma exhaustiva todos los fallos detectados, sus cau
   3. En `odooApi.js` se añadió `dedupeTasks()`, que al cargar elimina las tarjetas con `id` repetido que quedaron guardadas en `localStorage` por versiones anteriores, conservando la primera aparición.
 - **Alcance**: Presente desde la v3.8.0; no fue introducido por las correcciones de la v5.3.0.
 - **Prevención**: Cuando un método de la capa de datos ya inserta el registro, el llamador no debe volver a insertarlo. Con arreglos compartidos por referencia entre módulos, definir un único punto de inserción.
+
+---
+
+## 🛑 FALLO 18: Las Columnas del Tablero Nunca se Guardaban
+- **Síntoma**: Renombrar una columna, cambiarle el color, reordenarla, crear una nueva o borrar una existente se perdía por completo al recargar la página.
+- **Causa Raíz**: `persistDemo()` solo escribe `notion_demo_tasks`. Las etapas vivían únicamente en memoria (`this.demoStages = initialMockStages`), sin ninguna clave de `localStorage`, y además se mutaba directamente el objeto importado de `mockData.js`.
+- **Solución**: Se añadió una capa de persistencia de etapas en `odooApi.js` (`notion_demo_stages`) con `loadStages()` y `persistStages()`. `loadStages()` conserva lo guardado por el usuario y rellena solo los proyectos que aún no tengan columnas propias, de modo que añadir un proyecto nuevo a `mockData.js` sigue funcionando. Todas las mutaciones de columna en `app.js` llaman ahora a `persistStages()`.
+- **Prevención**: Todo estado que el usuario pueda modificar necesita su ruta de guardado; no basta con volver a renderizar.
+
+---
+
+## 🛑 FALLO 19: Tarjetas Invisibles al Mover a una Columna Nueva
+- **Síntoma**: Se creaba una columna, se arrastraba una tarjeta hacia ella y, tras recargar, la tarjeta desaparecía del tablero. Seguía existiendo (se veía en las vistas Tabla y Galería), pero el Kanban no la mostraba.
+- **Causa Raíz**: Consecuencia del FALLO 18. El movimiento de la tarjeta sí se guardaba (`persistDemo()`), pero la columna destino no. Al recargar, la tarea apuntaba a un `stage_id` inexistente y `renderBoardView()`, que dibuja recorriendo `this.stages` y filtrando por id, nunca la incluía en ninguna columna.
+- **Solución**:
+  1. Al persistir las etapas (FALLO 18), la columna destino sobrevive y el caso deja de producirse.
+  2. Como red de seguridad para los datos ya guardados, `renderBoardView()` agrupa ahora las tareas cuya etapa no existe en una columna "⚠️ Sin etapa" desde la que se pueden arrastrar de vuelta.
+- **Prevención**: Un renderizado que recorre un catálogo y filtra por clave foránea debe contemplar siempre las filas sin correspondencia, en lugar de omitirlas en silencio.
+
+---
+
+## 🛑 FALLO 20: Borrar una Columna Dejaba los Datos Incoherentes
+- **Síntoma**: Al borrar una columna, sus tareas se movían a otra y el borrado parecía correcto; tras recargar, la columna reaparecía vacía y las tareas se quedaban donde fueron movidas.
+- **Causa Raíz**: El movimiento de las tareas se guardaba pero el borrado de la etapa no (FALLO 18). Además `this.stages = this.stages.filter(...)` rompía la referencia compartida con `odooClient.demoStages[proyecto]`, el mismo patrón del FALLO 16.
+- **Solución**: Se sustituyó por `this.stages.splice(originalIndex, 1)` y se añadió `persistStages()` tanto al borrado como a su acción de deshacer.
+- **Prevención**: Con arreglos compartidos por referencia entre módulos, mutar siempre en su lugar; nunca reasignar con `filter()`.
+
+---
+
+## 🛑 FALLO 21: El Botón "+ Nueva Tarea" de la Cabecera No Hacía Nada
+- **Síntoma**: Pulsar "+ Nueva Tarea" en la cabecera no producía ningún efecto visible ni mensaje de error.
+- **Causa Raíz**: El handler llamaba `promptNewCard(stageId, stageName)` sin el tercer parámetro `colEl`. Dentro del método, el formulario solo se inserta en el DOM con `colEl.querySelector('.cards-container').appendChild(formEl)`, así que el elemento se creaba y quedaba huérfano, fuera del documento.
+- **Solución**: El handler localiza ahora la primera `.kanban-column` del tablero y se la pasa como `colEl`. Si el usuario está en Tabla o Galería, cambia primero a la vista Kanban (actualizando la pestaña activa) para que el formulario tenga dónde insertarse.
+- **Prevención**: Un parámetro opcional que en la práctica es obligatorio para que la función tenga efecto visible debe validarse o dejar de ser opcional.
+
+---
+
+## 🛑 FALLO 22: Escapado de HTML Ausente en las Vistas Kanban, Tabla y Galería
+- **Síntoma**: Un nombre como `Lona 12" x 18" <img src=x onerror=...>` insertaba un elemento real en la tarjeta del tablero, en la fila de la tabla y en la tarjeta de la galería.
+- **Causa Raíz**: El helper `esc()` del FALLO 14 se aplicó solo al modal de detalle. `createCardElement()`, `renderTableView()` y `renderGalleryView()` seguían interpolando en crudo nombres, iconos, etiquetas, portadas, socios y nombres de etapa.
+- **Solución**: Se aplicó `esc()` a todas las interpolaciones de las tres vistas y a los nombres y colores de columna.
+- **Prevención**: Al introducir un helper de escapado, recorrer todas las rutas de renderizado en la misma edición, no solo la que motivó el cambio.
+
+---
+
+## 🛑 FALLO 23: Una Tarea que Vence Hoy se Marcaba como Atrasada
+- **Síntoma**: Las tarjetas con fecha límite de hoy mostraban la píldora roja de "atrasado" y entraban en el filtro "urgente".
+- **Causa Raíz**: `new Date('2026-07-31') < new Date()`. Una cadena `YYYY-MM-DD` se interpreta como medianoche **UTC**; en UTC−6 esa medianoche corresponde a las 18:00 del día anterior en hora local, así que a cualquier hora del día la fecha ya quedaba en el pasado.
+- **Solución**: Se añadió el helper `isOverdue(dateStr)`, que construye la fecha con `new Date(año, mes-1, día)` (hora local) y la compara contra hoy a medianoche local. Se usa tanto en la píldora de la tarjeta como en el filtro "urgente".
+- **Prevención**: No comparar cadenas `YYYY-MM-DD` con `new Date()` directamente; construir la fecha en hora local y normalizar a medianoche.
