@@ -779,6 +779,9 @@ body {
 
 .notion-table {
   width: 100%;
+  /* Sin esto, en pantallas angostas el layout "auto" podía comprimir columnas
+     a un ancho ilegible en vez de activar el scroll horizontal del wrapper. */
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 13px;
   text-align: left;
@@ -1379,11 +1382,32 @@ body {
 }
 
 /* Notion Grid Table Block Styling */
+/* Contenedor de scroll propio: si la tabla no cabe, se desplaza SOLO ella, no
+   el modal completo (antes el modal entero se corría en horizontal). */
+.notion-grid-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 6px;
+  border-radius: var(--radius-sm);
+}
+
 .notion-grid-table {
   width: 100%;
+  min-width: 420px;
+  /* table-layout:fixed hace el ancho de columnas predecible. En modo "auto"
+     (por defecto), un <input> sin ancho propio deja el reparto de columnas a
+     un algoritmo heurístico del navegador que en la práctica podía asentarse
+     en el ancho máximo de contenido y desbordar el contenedor. */
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 12px;
-  margin-top: 6px;
+  margin-top: 0;
+}
+
+.notion-grid-table th:first-child,
+.notion-grid-table td:first-child {
+  width: 34%;
 }
 
 .notion-grid-table th, .notion-grid-table td {
@@ -1395,6 +1419,14 @@ body {
   background-color: var(--bg-sidebar);
   font-weight: 600;
   color: var(--text-muted);
+}
+
+/* Los inputs deben llenar su celda en vez de usar el ancho intrínseco del
+   navegador (~20 caracteres, ~200px) — esa era la causa real del desborde. */
+.notion-grid-table td input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Carousel Slider Block */
@@ -1558,6 +1590,18 @@ body {
   box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.18);
   outline: none;
   max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Dentro de una celda de tabla SÍ debe llenarla: sin esto, un <input>/<select>
+   dentro de una <td> pide su ancho intrínseco de navegador (~200px) durante
+   el cálculo de columnas, ensanchando la tabla de más al editar. max-width
+   por sí solo no evita esa petición inicial de espacio.
+   Fuera de una tabla (p. ej. las píldoras editables de la tarjeta Kanban, que
+   viven en un contenedor flex) NO se aplica: ahí el control debe conservar su
+   tamaño de contenido para no romper la fila de píldoras. */
+.cell-editable .inline-edit-control {
+  width: 100%;
 }
 
 .cell-editable { cursor: pointer; }

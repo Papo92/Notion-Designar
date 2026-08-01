@@ -1555,26 +1555,28 @@ class NotionKanbanApp {
                 </div>
               </div>
               <input type="text" class="block-table-title form-control" data-block-id="${blk.id}" value="${esc(blk.title || 'Tabla de Métricas')}" style="font-weight:700; font-size:13px;" />
-              <table class="notion-grid-table">
-                <thead>
-                  <tr>
-                    <th>Métrica / Ítem</th>
-                    <th>Meta</th>
-                    <th>Realista</th>
-                    <th>Desafiante</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rows.map((r, rIdx) => `
+              <div class="notion-grid-table-wrap">
+                <table class="notion-grid-table">
+                  <thead>
                     <tr>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="0" value="${esc(r[0])}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="1" value="${esc(r[1])}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="2" value="${esc(r[2])}" style="font-size:12px;" /></td>
-                      <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="3" value="${esc(r[3])}" style="font-size:12px;" /></td>
+                      <th>Métrica / Ítem</th>
+                      <th>Meta</th>
+                      <th>Realista</th>
+                      <th>Desafiante</th>
                     </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    ${rows.map((r, rIdx) => `
+                      <tr>
+                        <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="0" value="${esc(r[0])}" style="font-size:12px;" /></td>
+                        <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="1" value="${esc(r[1])}" style="font-size:12px;" /></td>
+                        <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="2" value="${esc(r[2])}" style="font-size:12px;" /></td>
+                        <td><input type="text" class="grid-cell-input form-control" data-block-id="${blk.id}" data-row="${rIdx}" data-col="3" value="${esc(r[3])}" style="font-size:12px;" /></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
               <button type="button" class="btn btn-sm add-table-row-btn" data-block-id="${blk.id}" style="font-size:11px; align-self:flex-start; margin-top:4px;">+ Añadir Fila</button>
             </div>
           `;

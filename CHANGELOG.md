@@ -251,3 +251,17 @@ funcionales pedidas tras revisar que el panel "se veía básico".
 - **Notificaciones en lugar de `alert()`**: se eliminaron los 6 `alert()` bloqueantes. Los mensajes de error se muestran en rojo y duran más. `showToast()` ahora escapa el HTML, que era otra vía de inyección.
 - **Galería más densa**: cada tarjeta muestra fecha límite (en rojo si está vencida) y los socios asignados.
 - Transición suave al cambiar de vista y respeto a `prefers-reduced-motion`.
+
+---
+
+## 🛑 FALLO 27: La Tabla del Constructor de Bloques Desbordaba el Modal Completo
+- **Síntoma**: Al añadir un bloque de "Cuadrícula / Tabla" dentro de una tarea, el modal entero se podía desplazar en horizontal para ver las columnas de la derecha (Meta, Realista, Desafiante), arrastrando consigo el título, la portada y el resto de campos. En algunos renders las columnas quedaban directamente inalcanzables.
+- **Causa Raíz**: Los `<input>` de cada celda (`.grid-cell-input`) no tenían un ancho propio, así que el navegador les asignaba su ancho intrínseco por defecto (~200px, equivalente a `size="20"`). Con 4 columnas de ese tamaño, la tabla exigía ~970px de ancho. Al no usar `table-layout: fixed`, el reparto de columnas quedaba en manos del algoritmo "auto" del navegador, que en la práctica se asentaba de forma inconsistente entre el ancho de contenido máximo (970px, desbordando) y el ancho realmente disponible — confirmado con capturas y mediciones repetidas en un navegador real que daban resultados distintos para la misma interacción. Como ningún contenedor intermedio tenía su propio scroll horizontal, el desborde subía hasta `.modal-card` (cuyo `overflow-y: auto` computa también `overflow-x: auto` por la regla CSS de que un eje no-visible fuerza al otro a `auto`), y el usuario terminaba desplazando el modal entero.
+- **Solución**:
+  1. La tabla ahora vive en su propio `.notion-grid-table-wrap` con `overflow-x: auto`: si no cabe, se desplaza **solo ella**, dejando fijo el resto del modal.
+  2. `.notion-grid-table` usa `table-layout: fixed` con un `min-width: 420px`, haciendo el ancho de columnas predecible en vez de depender de una heurística del navegador.
+  3. Los `<input>` de celda reciben `width: 100%; box-sizing: border-box;` para llenar su columna en vez de pedir su ancho intrínseco.
+  4. De paso, `.inline-edit-control` (editor inline de la Tabla/Kanban, v5.5.0) recibe el mismo tratamiento pero acotado a `.cell-editable .inline-edit-control`: dentro de una celda de tabla debe llenarla; fuera de una tabla (las píldoras editables de la tarjeta Kanban, en un contenedor flex) debe conservar su tamaño de contenido, o se habría estirado a todo lo ancho de la tarjeta.
+  5. La tabla principal (`.notion-table`, vista "Tabla / Notion DB") ya desplazaba correctamente en su propio contenedor; se le añadió `min-width: 760px` como refuerzo para que las columnas no se compriman a un ancho ilegible antes de activar el scroll.
+- **Verificación**: repetido 16 veces (4 anchos × 4 intentos) contra un servidor real en Chromium/Edge sin una sola falla, más confirmación visual de que desplazar la tabla dentro de su bloque no mueve el resto del modal.
+- **Prevención**: un `<input>` dentro de una `<td>` no hereda el `flex:1`/`align-items:stretch` que sí aplica a un input dentro de un contenedor flex — necesita su propio `width:100%` explícito. Ante cualquier tabla con inputs por celda, usar `table-layout:fixed` en vez de confiar en el reparto automático de columnas del navegador.
