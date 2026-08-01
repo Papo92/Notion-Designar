@@ -197,3 +197,30 @@ Este documento registra de forma exhaustiva todos los fallos detectados, sus cau
 - **Causa Raíz**: `new Date('2026-07-31') < new Date()`. Una cadena `YYYY-MM-DD` se interpreta como medianoche **UTC**; en UTC−6 esa medianoche corresponde a las 18:00 del día anterior en hora local, así que a cualquier hora del día la fecha ya quedaba en el pasado.
 - **Solución**: Se añadió el helper `isOverdue(dateStr)`, que construye la fecha con `new Date(año, mes-1, día)` (hora local) y la compara contra hoy a medianoche local. Se usa tanto en la píldora de la tarjeta como en el filtro "urgente".
 - **Prevención**: No comparar cadenas `YYYY-MM-DD` con `new Date()` directamente; construir la fecha en hora local y normalizar a medianoche.
+
+---
+
+## 🛑 FALLO 24: Los Videos y Documentos de Office se Rechazaban al Subirlos
+- **Síntoma**: Al adjuntar un video aparecía la alerta `Error subiendo archivo: Invalid base64 string format.` Las imágenes y los PDF sí funcionaban.
+- **Causa Raíz**: En `server.js` el `data:` URI se validaba con `/^data:([A-Za-z-+\/]+);base64,(.+)$/`. Esa clase de caracteres **no incluye dígitos ni puntos**, así que `video/mp4` fallaba por el `4`, `audio/mp3` por el `3` y los tipos de Office (`application/vnd.openxmlformats-officedocument...`) por los puntos. Solo pasaban los MIME formados únicamente por letras, como `image/png` o `application/pdf`.
+- **Solución**: Se amplió el patrón a los caracteres que admite un tipo MIME (`[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+`) y el mensaje de error ahora incluye la cabecera recibida para poder diagnosticarlo.
+- **Prevención**: Al validar tipos MIME con expresiones regulares, contemplar dígitos, puntos y guiones; no asumir que son solo letras.
+
+---
+
+## 🛑 FALLO 25: Un Archivo Grande Devolvía un Error Incomprensible
+- **Síntoma**: Al subir un archivo por encima del límite, el mensaje que veía el usuario era un error de parseo de JSON sin relación con el problema real.
+- **Causa Raíz**: Al superar el límite de `express.json()`, Express responde con una página **HTML** de error 413. El cliente hacía `await res.json()` sobre ese HTML y lanzaba una excepción de sintaxis que se mostraba tal cual.
+- **Solución**:
+  1. En `server.js`, un manejador de errores devuelve ahora JSON con un mensaje claro ante `entity.too.large`, y el límite subió a `100mb` (~75 MB reales, porque base64 infla ~33%).
+  2. En `app.js`, `handleFileUpload()` comprueba `file.size` **antes** de leer el archivo y avisa con el peso real y el máximo permitido, sugiriendo enlazar los videos grandes desde Drive o YouTube.
+  3. Si aun así la respuesta no es JSON, se traduce al código y texto de estado HTTP en lugar del error de parseo.
+- **Prevención**: Una API que responde JSON debe hacerlo también en sus rutas de error; y el cliente no debe asumir que toda respuesta es JSON.
+
+---
+
+## 🛑 FALLO 26: Los Videos Adjuntos No se Podían Reproducir
+- **Síntoma**: Una vez subido, un video aparecía como un genérico `📄 nombre.mp4` sin forma de verlo dentro del panel.
+- **Causa Raíz**: La tarjeta de adjuntos solo distinguía entre imagen y "documento" (`att.isImage`).
+- **Solución**: Los adjuntos guardan ahora `isVideo` y la tarjeta renderiza un `<video controls preload="metadata">`.
+- **Nota**: También se cambió el `id` del adjunto de `Date.now()` a `uid()` por el FALLO 15, y se añadió `public/uploads/` al `.gitignore`: son datos de usuario y no deben viajar en los commits ni en la imagen Docker.

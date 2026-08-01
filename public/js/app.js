@@ -64,7 +64,10 @@ const STAGE_COLORS = [
   'var(--column-gray)'
 ];
 
-const EMOJI_PRESETS = ['💳', '🤖', '📢', '🌐', '🎟️', '📦', '📍', '⚖️', '📘', '🎨', '🎁', '📅', '🚀', '📊', '💼', '📄'];
+// Debe quedar por debajo del límite de cuerpo del servidor (100mb en base64).
+const MAX_UPLOAD_MB = 70;
+
+const EMOJI_PRESETS =['💳', '🤖', '📢', '🌐', '🎟️', '📦', '📍', '⚖️', '📘', '🎨', '🎁', '📅', '🚀', '📊', '💼', '📄'];
 
 class NotionKanbanApp {
   constructor() {
@@ -987,6 +990,16 @@ class NotionKanbanApp {
   }
 
   async handleFileUpload(file, task) {
+    // Se avisa ANTES de leer el archivo: en base64 crece ~33%, así que pasado
+    // este tamaño el servidor lo rechazaría con un error poco claro.
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      throw new Error(
+        `"${file.name}" pesa ${mb} MB y el máximo son ${MAX_UPLOAD_MB} MB. ` +
+        `Para videos grandes, súbelos a Drive o YouTube y pega el enlace en la minuta.`
+      );
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async () => {
@@ -1000,14 +1013,23 @@ class NotionKanbanApp {
             })
           });
 
-          const data = await res.json();
+          // Si el servidor responde con HTML (proxy, 413, 502...), res.json()
+          // lanzaría un error críptico; se traduce a algo legible.
+          let data;
+          try {
+            data = await res.json();
+          } catch (parseErr) {
+            throw new Error(`El servidor respondió ${res.status} ${res.statusText || ''}`.trim());
+          }
+
           if (data.success) {
             if (!Array.isArray(task.attachments)) task.attachments = [];
             task.attachments.push({
-              id: Date.now(),
+              id: uid(),
               name: file.name,
               url: data.url,
-              isImage: file.type.startsWith('image/')
+              isImage: file.type.startsWith('image/'),
+              isVideo: file.type.startsWith('video/')
             });
 
             if (file.type.startsWith('image/') && !task.cover_image) {
@@ -1150,7 +1172,9 @@ class NotionKanbanApp {
       <div class="attachment-card">
         ${att.isImage
           ? `<img src="${esc(att.url)}" class="attachment-img-preview" alt="Attachment" />`
-          : `<div class="attachment-doc-badge">📄 ${esc(att.name)}</div>`
+          : att.isVideo
+            ? `<video src="${esc(att.url)}" class="attachment-img-preview" controls preload="metadata"></video>`
+            : `<div class="attachment-doc-badge">📄 ${esc(att.name)}</div>`
         }
         <div class="attachment-footer">
           <a href="${esc(att.url)}" target="_blank" style="color: var(--text-main); text-decoration:none;">Abrir</a>

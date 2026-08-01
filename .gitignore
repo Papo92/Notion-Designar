@@ -1,4 +1,7 @@
 node_modules/
+# Archivos que suben los usuarios: son datos, no codigo. En el VPS viven en el
+# volumen montado ./public y no deben viajar en los commits ni en la imagen.
+public/uploads/
 .DS_Store
 *.log
 id_ed25519*

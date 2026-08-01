@@ -27,9 +27,13 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// El cuerpo viaja en base64, que infla el tamaño ~33%: este limite equivale a
+// archivos reales de ~75 MB. Debe ir por encima de MAX_UPLOAD_MB del cliente.
+const BODY_LIMIT = '100mb';
+
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ limit: BODY_LIMIT, extended: true }));
 
 // Serve static assets — headers already set by global middleware above
 // etag:false and lastModified:false remove ALL conditional GET validators
@@ -49,9 +53,16 @@ app.post('/api/upload', (req, res) => {
       return res.status(400).json({ error: 'Missing fileName or fileData in request body.' });
     }
 
-    const matches = fileData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return res.status(400).json({ error: 'Invalid base64 string format.' });
+    // El tipo MIME admite digitos y puntos: video/mp4, audio/mp3 y los tipos de
+    // Office (application/vnd.openxmlformats-...) quedaban fuera del patron
+    // anterior [A-Za-z-+\/] y se rechazaban como "base64 invalido".
+    const matches = fileData.match(/^data:([a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+)?;base64,(.+)$/);
+    if (!matches || !matches[2]) {
+      const cabecera = String(fileData).slice(0, 60);
+      console.warn('Upload rechazado, cabecera recibida:', cabecera);
+      return res.status(400).json({
+        error: `Formato de archivo no reconocido. Cabecera recibida: "${cabecera}..."`
+      });
     }
 
     const base64Buffer = Buffer.from(matches[2], 'base64');
@@ -66,6 +77,18 @@ app.post('/api/upload', (req, res) => {
     console.error('File Upload Error:', err);
     res.status(500).json({ error: 'Internal server error uploading file: ' + err.message });
   }
+});
+
+// Sin esto, un archivo por encima del limite devuelve el HTML de error de
+// Express y el cliente falla al hacer res.json() con un mensaje incomprensible.
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({
+      error: `El archivo supera el limite del servidor (${BODY_LIMIT} en base64, ~75 MB reales). Sube uno mas ligero o enlaza el video desde Drive o YouTube.`
+    });
+  }
+  console.error('Error no controlado:', err);
+  return res.status(500).json({ error: err && err.message ? err.message : 'Error interno del servidor' });
 });
 
 // Odoo CORS Proxy Endpoint
