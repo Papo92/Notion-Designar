@@ -67,6 +67,26 @@ const STAGE_COLORS = [
 // Debe quedar por debajo del límite de cuerpo del servidor (100mb en base64).
 const MAX_UPLOAD_MB = 70;
 
+const PRIORITY_OPTIONS = [
+  { value: '0', label: 'Normal' },
+  { value: '1', label: '★ Alta' },
+  { value: '2', label: '🚨 Urgente' }
+];
+
+function priorityLabel(priority) {
+  const found = PRIORITY_OPTIONS.find(o => Number(o.value) === Number(priority || 0));
+  return found ? found.label : 'Normal';
+}
+
+// Fecha corta y legible ("2026-08-01" -> "1 ago"), sin salir del día local.
+function formatDeadline(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('-').map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) return String(dateStr);
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${parts[2]} ${meses[parts[1] - 1]}`;
+}
+
 const EMOJI_PRESETS =['💳', '🤖', '📢', '🌐', '🎟️', '📦', '📍', '⚖️', '📘', '🎨', '🎁', '📅', '🚀', '📊', '💼', '📄'];
 
 class NotionKanbanApp {
@@ -77,6 +97,13 @@ class NotionKanbanApp {
     this.stages = [];
     this.tasks = [];
     this.undoHistory = []; // Stack for Ctrl+Z undo support
+
+    this.tableSort = { key: null, dir: 1 };
+    try {
+      const guardado = JSON.parse(localStorage.getItem('notion_table_sort'));
+      if (guardado && guardado.key) this.tableSort = guardado;
+    } catch (e) { /* orden por defecto */ }
+
     this.draggedTaskId = null;
     this.draggedSubtaskId = null;
     this.searchQuery = '';
@@ -94,6 +121,7 @@ class NotionKanbanApp {
 
   initElements() {
     this.boardEl = document.getElementById('kanban-board');
+    this.summaryEl = document.getElementById('project-summary');
     this.statusBadgeEl = document.getElementById('status-badge');
     this.statusTextEl = document.getElementById('status-text');
     this.searchInputEl = document.getElementById('search-input');
@@ -181,13 +209,102 @@ class NotionKanbanApp {
     }, 7000);
   }
 
-  showToast(text) {
+  showToast(text, variant = 'success') {
     const toast = document.createElement('div');
-    toast.className = 'undo-toast';
-    toast.style.backgroundColor = '#10b981';
-    toast.innerHTML = `<span>${text}</span>`;
+    toast.className = `undo-toast toast-${variant}`;
+    const icono = variant === 'error' ? '⚠️' : '✓';
+    toast.innerHTML = `<span>${icono} ${esc(text)}</span>`;
     this.toastContainerEl.appendChild(toast);
-    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3500);
+    setTimeout(() => {
+      toast.classList.add('toast-leaving');
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 250);
+    }, variant === 'error' ? 6000 : 3000);
+  }
+
+  // Sustituye un elemento por un control de edición y aplica el cambio al
+  // confirmar. Evita tener que abrir el modal para tocar un solo campo.
+  inlineEdit(el, { type, value, options, onSave }) {
+    let control;
+
+    if (type === 'select') {
+      control = document.createElement('select');
+      options.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if (String(o.value) === String(value)) opt.selected = true;
+        control.appendChild(opt);
+      });
+    } else {
+      control = document.createElement('input');
+      control.type = type;
+      control.value = value == null ? '' : value;
+    }
+
+    control.className = 'inline-edit-control';
+    el.replaceWith(control);
+    control.focus();
+    if (type === 'date' && typeof control.showPicker === 'function') {
+      try { control.showPicker(); } catch (e) { /* el navegador puede negarse */ }
+    }
+
+    // `change` y `blur` se disparan ambos al elegir en un select: el guardián
+    // evita guardar y redibujar dos veces.
+    let cerrado = false;
+    const cerrar = (guardar) => {
+      if (cerrado) return;
+      cerrado = true;
+      if (guardar) {
+        onSave(control.value);
+        odooClient.persistDemo();
+      }
+      this.renderCurrentView();
+    };
+
+    control.addEventListener('change', () => cerrar(true));
+    control.addEventListener('blur', () => cerrar(true));
+    control.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') cerrar(true);
+      if (e.key === 'Escape') cerrar(false);
+    });
+  }
+
+  stageOptionsFor() {
+    return this.stages.map(s => ({ value: s.id, label: s.name }));
+  }
+
+  applyStageChange(task, newStageId) {
+    const stage = this.stages.find(s => Number(s.id) === Number(newStageId));
+    if (!stage) return;
+    task.stage_id = [Number(stage.id), stage.name];
+  }
+
+  // Estado vacío compartido: antes una búsqueda sin resultados dejaba la
+  // pantalla en blanco sin ninguna explicación.
+  renderEmptyState(icono, titulo, detalle) {
+    const hayFiltro = Boolean(this.searchQuery) || this.activePartnerFilter !== 'all';
+    const wrap = document.createElement('div');
+    wrap.className = 'empty-state';
+    wrap.innerHTML = `
+      <div class="empty-state-icon">${icono}</div>
+      <div class="empty-state-title">${esc(titulo)}</div>
+      <div class="empty-state-detail">${esc(detalle)}</div>
+      ${hayFiltro ? `<button class="btn btn-sm empty-state-action">Limpiar filtros</button>` : ''}
+    `;
+
+    const btn = wrap.querySelector('.empty-state-action');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        this.searchQuery = '';
+        if (this.searchInputEl) this.searchInputEl.value = '';
+        this.activePartnerFilter = 'all';
+        localStorage.setItem('notion_active_partner', 'all');
+        this.partnerBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+        this.renderCurrentView();
+      });
+    }
+
+    return wrap;
   }
 
   restoreActiveUIState() {
@@ -321,7 +438,15 @@ class NotionKanbanApp {
   }
 
   async loadData() {
-    this.boardEl.innerHTML = `<div style="padding: 40px; color: var(--text-muted);">Cargando vista Notion...</div>`;
+    // Esqueleto de carga: da la forma del tablero en vez de una línea de texto.
+    this.boardEl.className = 'kanban-board';
+    this.boardEl.innerHTML = Array.from({ length: 4 }, () => `
+      <div class="kanban-column skeleton-column">
+        <div class="skeleton-bar skeleton-header"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    `).join('');
     try {
       this.stages = await odooClient.getStages(this.currentProjectId);
       this.tasks = await odooClient.getTasks();
@@ -376,6 +501,8 @@ class NotionKanbanApp {
   }
 
   renderCurrentView() {
+    this.renderSummary();
+
     if (this.currentViewMode === 'table') {
       this.renderTableView();
     } else if (this.currentViewMode === 'gallery') {
@@ -385,11 +512,109 @@ class NotionKanbanApp {
     }
   }
 
+  // Franja de métricas del proyecto. Refleja exactamente lo que hay en pantalla,
+  // así que responde a la búsqueda y al filtro de socio.
+  renderSummary() {
+    if (!this.summaryEl) return;
+
+    const tareas = this.getFilteredTasks();
+    if (tareas.length === 0) {
+      this.summaryEl.innerHTML = '';
+      this.summaryEl.classList.add('is-hidden');
+      return;
+    }
+    this.summaryEl.classList.remove('is-hidden');
+
+    const atrasadas = tareas.filter(t => isOverdue(t.date_deadline)).length;
+    const avance = Math.round(tareas.reduce((sum, t) => sum + this.calculateProgress(t), 0) / tareas.length);
+    const terminadas = tareas.filter(t => this.calculateProgress(t) === 100).length;
+
+    // Vencimientos dentro de los próximos 7 días (sin contar las ya vencidas).
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const limite = new Date(hoy); limite.setDate(limite.getDate() + 7);
+    const proximas = tareas.filter(t => {
+      if (!t.date_deadline || isOverdue(t.date_deadline)) return false;
+      const p = String(t.date_deadline).split('-').map(Number);
+      if (p.length < 3 || p.some(isNaN)) return false;
+      const f = new Date(p[0], p[1] - 1, p[2]);
+      return f >= hoy && f <= limite;
+    }).length;
+
+    const porEtapa = this.stages.map(s => ({
+      nombre: s.name,
+      color: s.color,
+      total: tareas.filter(t => {
+        const id = Array.isArray(t.stage_id) ? t.stage_id[0] : t.stage_id;
+        return Number(id) === Number(s.id);
+      }).length
+    }));
+    const maxEtapa = Math.max(1, ...porEtapa.map(e => e.total));
+
+    const cuenta = (rol) => tareas.filter(t =>
+      Array.isArray(t.user_ids) && t.user_ids.some(u => u.role === rol || (u.name || '').toLowerCase().includes(rol))
+    ).length;
+
+    this.summaryEl.innerHTML = `
+      <div class="summary-metrics">
+        <div class="summary-metric">
+          <span class="summary-value">${tareas.length}</span>
+          <span class="summary-label">tareas</span>
+        </div>
+        <div class="summary-metric ${atrasadas > 0 ? 'is-alert' : ''}">
+          <span class="summary-value">${atrasadas}</span>
+          <span class="summary-label">atrasadas</span>
+        </div>
+        <div class="summary-metric ${proximas > 0 ? 'is-warn' : ''}">
+          <span class="summary-value">${proximas}</span>
+          <span class="summary-label">esta semana</span>
+        </div>
+        <div class="summary-metric">
+          <span class="summary-value">${terminadas}</span>
+          <span class="summary-label">completadas</span>
+        </div>
+      </div>
+
+      <div class="summary-progress-group">
+        <div class="summary-progress-head">
+          <span class="summary-label">Avance global</span>
+          <span class="summary-percent">${avance}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill ${avance === 100 ? 'complete' : ''}" style="width:${avance}%"></div></div>
+      </div>
+
+      <div class="summary-stages">
+        ${porEtapa.map(e => `
+          <div class="summary-stage" title="${esc(e.nombre)}: ${e.total}">
+            <div class="summary-stage-bar" style="height:${Math.round((e.total / maxEtapa) * 100)}%; background-color:${esc(e.color)};"></div>
+            <span class="summary-stage-count">${e.total}</span>
+            <span class="summary-stage-name">${esc(e.nombre)}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="summary-partners">
+        <span class="summary-partner" title="Tareas de Abelardo">👨‍💻 ${cuenta('abelardo')}</span>
+        <span class="summary-partner" title="Tareas de Regina">👩‍💼 ${cuenta('regina')}</span>
+      </div>
+    `;
+  }
+
   renderBoardView() {
     this.boardEl.innerHTML = '';
     this.boardEl.className = 'kanban-board';
 
     const filteredTasks = this.getFilteredTasks();
+
+    // Solo se sustituye el tablero cuando el vacío lo causa un filtro. Si el
+    // proyecto simplemente no tiene tareas, hay que dejar las columnas para
+    // que el usuario pueda crear la primera.
+    const hayFiltro = Boolean(this.searchQuery) || this.activePartnerFilter !== 'all';
+    if (filteredTasks.length === 0 && hayFiltro) {
+      this.boardEl.classList.add('is-empty');
+      this.boardEl.appendChild(this.renderEmptyState('🔍', 'Sin resultados',
+        'Ninguna tarea de este proyecto coincide con el filtro activo.'));
+      return;
+    }
 
     this.stages.forEach((stage, idx) => {
       const stageTasks = filteredTasks.filter(t => {
@@ -460,7 +685,7 @@ class NotionKanbanApp {
       const deleteColBtn = colEl.querySelector('.column-delete-btn');
       deleteColBtn.addEventListener('click', () => {
         if (this.stages.length <= 1) {
-          alert('Debe haber al menos una columna en el tablero.');
+          this.showToast('Debe haber al menos una columna en el tablero.', 'error');
           return;
         }
 
@@ -600,64 +825,137 @@ class NotionKanbanApp {
     this.boardEl.appendChild(addColBtn);
   }
 
+  // Comparadores por columna para el orden de la tabla.
+  tableSortValue(task, key) {
+    switch (key) {
+      case 'name': return (task.name || '').toLowerCase();
+      case 'stage': return this.stages.findIndex(s => {
+        const id = Array.isArray(task.stage_id) ? task.stage_id[0] : task.stage_id;
+        return Number(s.id) === Number(id);
+      });
+      case 'progress': return this.calculateProgress(task);
+      case 'priority': return Number(task.priority || 0);
+      case 'partner': return (Array.isArray(task.user_ids) ? task.user_ids.map(u => u.name).join(', ') : '').toLowerCase();
+      // Las tareas sin fecha van siempre al final, ordene como ordene.
+      case 'deadline': return task.date_deadline || '9999-12-31';
+      case 'tags': return (Array.isArray(task.tag_ids) ? task.tag_ids.length : 0);
+      default: return 0;
+    }
+  }
+
   renderTableView() {
     this.boardEl.innerHTML = '';
     this.boardEl.className = 'notion-table-view';
 
-    const filteredTasks = this.getFilteredTasks();
+    const filteredTasks = [...this.getFilteredTasks()];
+
+    if (filteredTasks.length === 0) {
+      this.boardEl.appendChild(this.renderEmptyState('🔍', 'Sin tareas que mostrar',
+        'No hay ninguna tarea que coincida con lo que estás buscando.'));
+      return;
+    }
+
+    const columnas = [
+      { key: 'name', label: 'Nombre de Tarea' },
+      { key: 'stage', label: 'Estado / Etapa' },
+      { key: 'progress', label: 'Progreso' },
+      { key: 'priority', label: 'Prioridad' },
+      { key: 'partner', label: 'Socio Responsable' },
+      { key: 'deadline', label: 'Fecha Límite' },
+      { key: 'tags', label: 'Etiquetas' }
+    ];
+
+    if (this.tableSort.key) {
+      const { key, dir } = this.tableSort;
+      filteredTasks.sort((a, b) => {
+        const va = this.tableSortValue(a, key);
+        const vb = this.tableSortValue(b, key);
+        if (va < vb) return -1 * dir;
+        if (va > vb) return 1 * dir;
+        return 0;
+      });
+    }
 
     const tableEl = document.createElement('table');
     tableEl.className = 'notion-table';
     tableEl.innerHTML = `
       <thead>
         <tr>
-          <th>Nombre de Tarea</th>
-          <th>Estado / Etapa</th>
-          <th>Progreso</th>
-          <th>Prioridad</th>
-          <th>Socio Responsable</th>
-          <th>Fecha Límite</th>
-          <th>Etiquetas</th>
+          ${columnas.map(c => {
+            const activa = this.tableSort.key === c.key;
+            const flecha = activa ? (this.tableSort.dir === 1 ? '▲' : '▼') : '';
+            return `<th class="sortable-th ${activa ? 'is-sorted' : ''}" data-key="${c.key}" title="Ordenar por ${esc(c.label)}">
+              ${esc(c.label)}<span class="sort-arrow">${flecha}</span>
+            </th>`;
+          }).join('')}
         </tr>
       </thead>
       <tbody></tbody>
     `;
 
+    tableEl.querySelectorAll('.sortable-th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        // Mismo encabezado: alterna sentido. Otro: empieza ascendente.
+        this.tableSort = (this.tableSort.key === key)
+          ? { key, dir: this.tableSort.dir * -1 }
+          : { key, dir: 1 };
+        localStorage.setItem('notion_table_sort', JSON.stringify(this.tableSort));
+        this.renderTableView();
+      });
+    });
+
     const tbody = tableEl.querySelector('tbody');
 
     filteredTasks.forEach(t => {
       const stageName = Array.isArray(t.stage_id) ? t.stage_id[1] : 'Sin Etapa';
+      const stageId = Array.isArray(t.stage_id) ? t.stage_id[0] : t.stage_id;
       const tr = document.createElement('tr');
       const percent = this.calculateProgress(t);
 
-      let priorityText = 'Normal';
-      if (Number(t.priority) === 1) priorityText = '★ Alta';
-      if (Number(t.priority) === 2) priorityText = '🚨 Urgente Socio';
+      const socios = (Array.isArray(t.user_ids) && t.user_ids.length > 0)
+        ? t.user_ids.map(u => u.name).join(', ')
+        : 'Ninguno';
 
-      let socios = 'Ninguno';
-      if (Array.isArray(t.user_ids) && t.user_ids.length > 0) {
-        socios = t.user_ids.map(u => u.name).join(', ');
-      }
-
-      let tagsText = '';
-      if (Array.isArray(t.tag_ids)) {
-        tagsText = t.tag_ids.map(tag => `<span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>`).join(' ');
-      }
+      const tagsText = Array.isArray(t.tag_ids)
+        ? t.tag_ids.map(tag => `<span class="tag-pill tag-${esc(tag.color || 'blue')}">${esc(tag.name)}</span>`).join(' ')
+        : '';
 
       tr.innerHTML = `
-        <td style="font-weight: 500;">${esc(t.icon || '📄')} ${esc(t.name)}</td>
-        <td><span class="status-badge">${esc(stageName)}</span></td>
+        <td class="cell-editable" data-edit="name" style="font-weight: 500;" title="Clic para renombrar">${esc(t.icon || '📄')} <span class="cell-value">${esc(t.name)}</span></td>
+        <td class="cell-editable" data-edit="stage" title="Clic para cambiar de etapa"><span class="status-badge">${esc(stageName)}</span></td>
         <td>
           <div class="card-progress-wrapper" style="width: 100px;">
             <div class="progress-track"><div class="progress-fill ${percent === 100 ? 'complete' : ''}" style="width: ${percent}%;"></div></div>
             <span class="progress-label">${percent}%</span>
           </div>
         </td>
-        <td>${priorityText}</td>
+        <td class="cell-editable" data-edit="priority" title="Clic para cambiar la prioridad"><span class="cell-value">${esc(priorityLabel(t.priority))}</span></td>
         <td>${esc(socios)}</td>
-        <td>${esc(t.date_deadline || '-')}</td>
+        <td class="cell-editable" data-edit="deadline" title="Clic para cambiar la fecha">
+          <span class="cell-value ${isOverdue(t.date_deadline) ? 'is-overdue' : ''}">${esc(t.date_deadline || '—')}</span>
+        </td>
         <td>${tagsText}</td>
       `;
+
+      tr.querySelectorAll('.cell-editable').forEach(td => {
+        td.addEventListener('click', (e) => {
+          // Sin esto el clic subiría a la fila y abriría el modal de detalle.
+          e.stopPropagation();
+          const campo = td.dataset.edit;
+          const destino = td.querySelector('.cell-value') || td;
+
+          if (campo === 'name') {
+            this.inlineEdit(destino, { type: 'text', value: t.name, onSave: v => { if (v.trim()) t.name = v.trim(); } });
+          } else if (campo === 'stage') {
+            this.inlineEdit(destino, { type: 'select', value: stageId, options: this.stageOptionsFor(), onSave: v => this.applyStageChange(t, v) });
+          } else if (campo === 'priority') {
+            this.inlineEdit(destino, { type: 'select', value: t.priority || '0', options: PRIORITY_OPTIONS, onSave: v => { t.priority = v; } });
+          } else if (campo === 'deadline') {
+            this.inlineEdit(destino, { type: 'date', value: t.date_deadline || '', onSave: v => { t.date_deadline = v; } });
+          }
+        });
+      });
 
       tr.addEventListener('click', () => this.openDetailModal(t));
       tbody.appendChild(tr);
@@ -671,6 +969,12 @@ class NotionKanbanApp {
     this.boardEl.className = 'notion-gallery-view';
 
     const filteredTasks = this.getFilteredTasks();
+
+    if (filteredTasks.length === 0) {
+      this.boardEl.appendChild(this.renderEmptyState('🖼️', 'Galería vacía',
+        'No hay ninguna tarea que coincida con lo que estás buscando.'));
+      return;
+    }
 
     filteredTasks.forEach(t => {
       const cardEl = document.createElement('div');
@@ -688,6 +992,12 @@ class NotionKanbanApp {
         `</div>`;
       }
 
+      const socios = (Array.isArray(t.user_ids) ? t.user_ids : []).map(u => {
+        if (u.role === 'abelardo' || /abelardo/i.test(u.name || '')) return '👨‍💻';
+        if (u.role === 'regina' || /regina/i.test(u.name || '')) return '👩‍💼';
+        return '👥';
+      }).join(' ');
+
       cardEl.innerHTML = `
         ${imgHtml}
         <div class="gallery-card-body">
@@ -697,6 +1007,12 @@ class NotionKanbanApp {
             <span class="progress-label">${percent}%</span>
           </div>
           ${tagsHtml}
+          <div class="gallery-card-meta">
+            <span class="${isOverdue(t.date_deadline) ? 'is-overdue' : ''}">
+              ${t.date_deadline ? '📅 ' + esc(formatDeadline(t.date_deadline)) : '📅 Sin fecha'}
+            </span>
+            <span>${socios || '—'}</span>
+          </div>
         </div>
       `;
 
@@ -733,11 +1049,11 @@ class NotionKanbanApp {
       </div>
     `;
 
-    let priorityHtml = '';
-    if (Number(task.priority) > 0) {
-      const stars = Number(task.priority) === 2 ? '🚨 Urgencia' : '★ Alta';
-      priorityHtml = `<span class="priority-star" title="Prioridad: ${esc(task.priority)}">${stars}</span>`;
-    }
+    // Siempre visible y clicable: cambiar la prioridad ya no obliga a abrir el modal.
+    const prioridadTexto = Number(task.priority) === 2 ? '🚨 Urgencia'
+      : Number(task.priority) === 1 ? '★ Alta'
+      : '○ Normal';
+    const priorityHtml = `<span class="priority-star editable-pill ${Number(task.priority) > 0 ? '' : 'is-neutral'}" data-edit="priority" title="Clic para cambiar la prioridad">${prioridadTexto}</span>`;
 
     let partnerBadgesHtml = '';
     if (Array.isArray(task.user_ids) && task.user_ids.length > 0) {
@@ -763,10 +1079,10 @@ class NotionKanbanApp {
       attachHtml = `<div class="subtasks-pill" title="Archivos adjuntos">📎 ${task.attachments.length}</div>`;
     }
 
-    let deadlineHtml = '';
-    if (task.date_deadline) {
-      deadlineHtml = `<div class="deadline-pill ${isOverdue(task.date_deadline) ? 'overdue' : ''}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${task.date_deadline}</div>`;
-    }
+    const iconoCalendario = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
+    const deadlineHtml = task.date_deadline
+      ? `<div class="deadline-pill editable-pill ${isOverdue(task.date_deadline) ? 'overdue' : ''}" data-edit="deadline" title="Vence el ${esc(task.date_deadline)} — clic para cambiar">${iconoCalendario} ${esc(formatDeadline(task.date_deadline))}</div>`
+      : `<div class="deadline-pill editable-pill is-neutral" data-edit="deadline" title="Clic para poner fecha límite">${iconoCalendario} Sin fecha</div>`;
 
     cardEl.innerHTML = `
       ${coverHtml}
@@ -816,6 +1132,18 @@ class NotionKanbanApp {
     };
 
     editIcon.addEventListener('click', handleInlineTitleEdit);
+
+    // Píldoras editables sin abrir el modal.
+    cardEl.querySelectorAll('.editable-pill').forEach(pill => {
+      pill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (pill.dataset.edit === 'priority') {
+          this.inlineEdit(pill, { type: 'select', value: task.priority || '0', options: PRIORITY_OPTIONS, onSave: v => { task.priority = v; } });
+        } else {
+          this.inlineEdit(pill, { type: 'date', value: task.date_deadline || '', onSave: v => { task.date_deadline = v; } });
+        }
+      });
+    });
 
     cardEl.addEventListener('dragstart', (e) => {
       this.draggedTaskId = task.id;
@@ -867,6 +1195,7 @@ class NotionKanbanApp {
       task.stage_id = [Number(stageId), stageName];
       odooClient.persistDemo();
       this.renderCurrentView();
+      this.showToast(`"${task.name}" → ${stageName}`);
 
       try {
         await odooClient.updateTaskStage(taskId, stageId, stageName);
@@ -922,7 +1251,7 @@ class NotionKanbanApp {
           odooClient.persistDemo();
           this.renderCurrentView();
         } catch (err) {
-          alert('Error creando tarea: ' + err.message);
+          this.showToast('Error creando tarea: ' + err.message, 'error');
         } finally {
           submitting = false;
         }
@@ -977,9 +1306,9 @@ class NotionKanbanApp {
 
       try {
         await odooClient.authenticate();
-        alert('¡Conexión exitosa con Odoo!');
+        this.showToast('¡Conexión exitosa con Odoo!');
       } catch (err) {
-        alert('Error conectando a Odoo: ' + err.message);
+        this.showToast('Error conectando a Odoo: ' + err.message, 'error');
         return;
       }
     }
@@ -1646,7 +1975,7 @@ class NotionKanbanApp {
           try {
             await this.handleFileUpload(file, task);
           } catch (err) {
-            alert('Error subiendo archivo: ' + err.message);
+            this.showToast(err.message, 'error');
           }
         }
         this.refreshDetailModal(task);
@@ -1670,7 +1999,7 @@ class NotionKanbanApp {
             const url = await this.handleFileUpload(file, task);
             this.refreshDetailModal(task, () => { task.cover_image = url; });
           } catch (err) {
-            alert('Error subiendo imagen de portada: ' + err.message);
+            this.showToast(err.message, 'error');
           }
         }
       });

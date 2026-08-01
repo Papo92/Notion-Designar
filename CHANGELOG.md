@@ -224,3 +224,30 @@ Este documento registra de forma exhaustiva todos los fallos detectados, sus cau
 - **Causa Raíz**: La tarjeta de adjuntos solo distinguía entre imagen y "documento" (`att.isImage`).
 - **Solución**: Los adjuntos guardan ahora `isVideo` y la tarjeta renderiza un `<video controls preload="metadata">`.
 - **Nota**: También se cambió el `id` del adjunto de `Date.now()` a `uid()` por el FALLO 15, y se añadió `public/uploads/` al `.gitignore`: son datos de usuario y no deben viajar en los commits ni en la imagen Docker.
+
+---
+
+# ✨ MEJORAS
+
+## 🚀 v5.5.0 — Edición rápida, resumen del proyecto y pulido de interfaz
+
+Hasta aquí el registro recoge correcciones. Esta entrada documenta mejoras
+funcionales pedidas tras revisar que el panel "se veía básico".
+
+### Edición sin abrir el modal
+- **Tabla ordenable**: las 7 cabeceras ordenan al pulsarlas y el segundo clic invierte el sentido, con flecha indicadora. El criterio elegido se guarda en `notion_table_sort` y se recuerda entre sesiones. Al ordenar por fecha, las tareas sin fecha van siempre al final independientemente del sentido.
+- **Celdas editables en la tabla**: nombre, etapa, prioridad y fecha se editan con un clic. `stopPropagation()` evita que el clic suba a la fila y abra el modal.
+- **Píldoras editables en la tarjeta Kanban**: prioridad y fecha se cambian desde la propia tarjeta. La prioridad ahora se muestra siempre (antes solo aparecía si era alta o urgente) y las tareas sin fecha ofrecen un "Sin fecha" pulsable.
+- Helper común `inlineEdit()`: sustituye el elemento por un control, guarda con `change`, `blur` o Enter, y cancela con Escape. Un guardián interno evita el doble guardado, porque `change` y `blur` se disparan ambos al elegir en un desplegable.
+
+### Resumen del proyecto
+- Franja superior con tareas totales, atrasadas, vencimientos de los próximos 7 días y completadas; avance global; mini gráfico de barras por etapa; y reparto por socio.
+- Refleja exactamente lo que hay en pantalla: responde a la búsqueda y al filtro de socio, y se oculta cuando no hay nada que resumir.
+
+### Pulido de interfaz
+- **Estados vacíos** en las tres vistas, con botón para limpiar los filtros. Antes una búsqueda sin resultados dejaba la pantalla en blanco sin explicación. En el Kanban solo sustituyen al tablero si el vacío lo causa un filtro: si el proyecto simplemente no tiene tareas, las columnas se conservan para poder crear la primera.
+- **Arrastrar y soltar**: la columna destino se resalta y muestra un hueco "Soltar aquí" animado; la tarjeta arrastrada se inclina y atenúa; al soltar aparece una confirmación con el destino.
+- **Esqueleto de carga** con la forma del tablero, en lugar de la línea de texto "Cargando vista Notion...".
+- **Notificaciones en lugar de `alert()`**: se eliminaron los 6 `alert()` bloqueantes. Los mensajes de error se muestran en rojo y duran más. `showToast()` ahora escapa el HTML, que era otra vía de inyección.
+- **Galería más densa**: cada tarjeta muestra fecha límite (en rojo si está vencida) y los socios asignados.
+- Transición suave al cambiar de vista y respeto a `prefers-reduced-motion`.

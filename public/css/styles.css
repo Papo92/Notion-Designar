@@ -1416,3 +1416,317 @@ body {
 }
 
 
+
+/* ============================================================
+   v5.5.0 — Resumen del proyecto, edición inline y pulido visual
+   ============================================================ */
+
+/* Franja de resumen del proyecto */
+.project-summary {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  margin: 0 0 2px;
+  background-color: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.project-summary.is-hidden { display: none; }
+
+.summary-metrics { display: flex; gap: 18px; }
+
+.summary-metric {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-metric.is-alert .summary-value { color: #ef4444; }
+.summary-metric.is-warn .summary-value { color: #f59e0b; }
+
+.summary-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.summary-progress-group { min-width: 170px; flex: 0 1 220px; }
+
+.summary-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.summary-percent {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mini gráfico de barras por etapa */
+.summary-stages {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 46px;
+}
+
+.summary-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 42px;
+}
+
+.summary-stage-bar {
+  width: 100%;
+  min-height: 3px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border: 1px solid var(--border-light);
+  border-bottom: none;
+  transition: height 0.3s ease;
+}
+
+.summary-stage-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-stage-name {
+  font-size: 9px;
+  color: var(--text-light);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-partners { display: flex; gap: 10px; }
+
+.summary-partner {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 3px 10px;
+}
+
+/* Edición inline */
+.editable-pill {
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editable-pill:hover {
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+
+.editable-pill.is-neutral {
+  color: var(--text-light);
+  background-color: transparent;
+  border: 1px dashed var(--border-strong);
+}
+
+.inline-edit-control {
+  font-family: var(--font-family);
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid #2383e2;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.18);
+  outline: none;
+  max-width: 100%;
+}
+
+.cell-editable { cursor: pointer; }
+.cell-editable:hover { background-color: var(--bg-hover); }
+.cell-value.is-overdue { color: #ef4444; font-weight: 600; }
+
+/* Cabeceras ordenables de la tabla */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+
+.sortable-th:hover { background-color: var(--bg-hover); }
+.sortable-th.is-sorted { color: var(--text-main); font-weight: 700; }
+
+.sort-arrow {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 9px;
+  color: #2383e2;
+}
+
+/* Estados vacíos */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 60px 20px;
+  margin: 0 auto;
+  text-align: center;
+  width: 100%;
+}
+
+.empty-state-icon { font-size: 40px; opacity: 0.65; }
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.empty-state-detail {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 340px;
+}
+
+.empty-state-action { margin-top: 8px; }
+
+.kanban-board.is-empty { display: block; }
+
+/* Metadatos en las tarjetas de galería */
+.gallery-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.gallery-card-meta .is-overdue { color: #ef4444; font-weight: 600; }
+
+/* Arrastre: destino visible */
+.kanban-column.drag-over {
+  outline: 2px dashed #2383e2;
+  outline-offset: -3px;
+  background-color: var(--column-blue);
+}
+
+.kanban-column.drag-over .cards-container::after {
+  content: 'Soltar aquí';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  margin-top: 6px;
+  border: 2px dashed #2383e2;
+  border-radius: var(--radius-md);
+  color: #2383e2;
+  font-size: 11px;
+  font-weight: 600;
+  animation: dropPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes dropPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.notion-card.dragging {
+  opacity: 0.45;
+  transform: rotate(1.5deg) scale(0.98);
+}
+
+.notion-card {
+  transition: box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* Esqueleto de carga */
+.skeleton-column { pointer-events: none; }
+
+.skeleton-bar, .skeleton-card {
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--bg-subtle) 25%, var(--bg-hover) 50%, var(--bg-subtle) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.3s ease-in-out infinite;
+}
+
+.skeleton-header { height: 20px; margin-bottom: 12px; width: 65%; }
+.skeleton-card { height: 76px; margin-bottom: 8px; }
+
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Notificaciones */
+.undo-toast {
+  animation: toastIn 0.22s ease-out;
+}
+
+.undo-toast.toast-leaving {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.undo-toast.toast-success { background-color: #10b981; }
+.undo-toast.toast-error { background-color: #ef4444; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Transición al cambiar de vista */
+.kanban-board, .notion-table-view, .notion-gallery-view {
+  animation: viewFadeIn 0.22s ease-out;
+}
+
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanban-board, .notion-table-view, .notion-gallery-view,
+  .undo-toast, .skeleton-bar, .skeleton-card,
+  .kanban-column.drag-over .cards-container::after {
+    animation: none;
+  }
+}
+
+/* Resumen y tabla en móvil */
+@media (max-width: 768px) {
+  .project-summary {
+    gap: 14px;
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+
+  .summary-stages { display: none; }
+  .summary-progress-group { flex: 1 1 130px; min-width: 130px; }
+}
