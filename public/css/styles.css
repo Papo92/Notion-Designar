@@ -1774,3 +1774,69 @@ body {
   .summary-stages { display: none; }
   .summary-progress-group { flex: 1 1 130px; min-width: 130px; }
 }
+
+/* ============================================================
+   Secciones opcionales del modal de detalle
+   ============================================================ */
+.section-toggle-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--border-strong);
+  border-bottom: 1px dashed var(--border-strong);
+}
+
+.section-toggle-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 2px;
+}
+
+.section-toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background-color: var(--bg-subtle);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease, border-style 0.15s ease;
+}
+
+.section-toggle-chip:hover {
+  background-color: var(--bg-hover);
+}
+
+/* Sección oculta: la píldora queda tenue y punteada, como una casilla sin
+   marcar, para que sea obvio con un vistazo cuáles secciones están activas. */
+.section-toggle-chip.is-off {
+  border-style: dashed;
+  background-color: transparent;
+  color: var(--text-light);
+  opacity: 0.6;
+}
+
+.section-toggle-chip.is-off:hover {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .section-toggle-bar {
+    gap: 5px;
+  }
+  .section-toggle-chip {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}

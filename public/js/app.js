@@ -73,6 +73,23 @@ const PRIORITY_OPTIONS = [
   { value: '2', label: '🚨 Urgente' }
 ];
 
+// Secciones opcionales del modal de detalle. Icono/Título y Etapa/Prioridad/
+// Fecha se quedan siempre visibles porque son el mínimo indispensable para que
+// la tarea exista y funcione en el Kanban; el resto es contenido que no toda
+// tarea necesita, así que el usuario decide cuáles ver.
+// Ocultar una sección NUNCA borra sus datos — solo deja de mostrarla en el
+// modal (igual que colapsar una propiedad en Notion).
+const OPTIONAL_SECTIONS = [
+  { key: 'progress', icon: '📊', label: 'Progreso' },
+  { key: 'partner', icon: '👥', label: 'Socio' },
+  { key: 'tags', icon: '🏷️', label: 'Etiquetas' },
+  { key: 'cover', icon: '🖼️', label: 'Portada' },
+  { key: 'subkanban', icon: '🗂️', label: 'Sub-Kanban' },
+  { key: 'attachments', icon: '📎', label: 'Adjuntos' },
+  { key: 'blocks', icon: '🧩', label: 'Bloques' },
+  { key: 'description', icon: '📝', label: 'Minuta' }
+];
+
 function priorityLabel(priority) {
   const found = PRIORITY_OPTIONS.find(o => Number(o.value) === Number(priority || 0));
   return found ? found.label : 'Normal';
@@ -1467,6 +1484,19 @@ class NotionKanbanApp {
     if (!Array.isArray(task.subtasks)) task.subtasks = [];
     if (!Array.isArray(task.attachments)) task.attachments = [];
     if (!Array.isArray(task.tag_ids)) task.tag_ids = [];
+    if (!Array.isArray(task.hiddenSections)) task.hiddenSections = [];
+
+    const sectionVisible = (key) => !task.hiddenSections.includes(key);
+
+    const sectionToggleBarHtml = `
+      <div class="section-toggle-bar">
+        <span class="section-toggle-label">Secciones</span>
+        ${OPTIONAL_SECTIONS.map(s => {
+          const on = sectionVisible(s.key);
+          return `<button type="button" class="section-toggle-chip ${on ? '' : 'is-off'}" data-section="${s.key}" title="${on ? 'Ocultar' : 'Mostrar'} sección de ${esc(s.label)}">${s.icon} ${esc(s.label)}</button>`;
+        }).join('')}
+      </div>
+    `;
 
     const percent = this.calculateProgress(task);
 
@@ -1630,7 +1660,7 @@ class NotionKanbanApp {
     };
 
     const hasCover = Boolean(task.cover_image);
-    const coverBannerHtml = hasCover ? `
+    const coverBannerHtml = (hasCover && sectionVisible('cover')) ? `
       <div class="modal-cover-banner" style="background-image: url('${esc(task.cover_image)}');">
         <div class="cover-banner-overlay">
           <button type="button" id="upload-cover-direct-btn" class="btn btn-sm btn-primary" style="padding: 4px 10px; font-size: 11px;">📷 Cambiar Portada</button>
@@ -1657,26 +1687,7 @@ class NotionKanbanApp {
     // Emoji Presets Bar
     const emojiPresetsHtml = EMOJI_PRESETS.map(e => `<button type="button" class="emoji-preset-btn" data-emoji="${e}" style="background:none; border:none; font-size:16px; cursor:pointer; padding:2px;">${e}</button>`).join('');
 
-    this.detailModalBodyEl.innerHTML = `
-      ${coverBannerHtml}
-
-      <div style="display: flex; gap: 8px; align-items: flex-end;">
-        <div class="form-group" style="width: 70px;">
-          <label>Icono</label>
-          <input type="text" id="detail-task-icon" class="form-control" value="${esc(task.icon || '📄')}" style="text-align: center; font-size: 18px;" />
-        </div>
-        <div class="form-group" style="flex: 1;">
-          <label>Título de la Tarea / Proyecto</label>
-          <input type="text" id="detail-task-name" class="form-control" value="${esc(task.name)}" style="font-size: 16px; font-weight: 600;" />
-        </div>
-      </div>
-
-      <!-- Emoji Presets bar -->
-      <div style="display:flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; align-items:center;">
-        <span style="font-size:11px; color:var(--text-muted);">Iconos rápidos:</span>
-        ${emojiPresetsHtml}
-      </div>
-
+    const progressHtml = sectionVisible('progress') ? `
       <div class="form-group" style="margin-top: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
           <label>Progreso General</label>
@@ -1686,28 +1697,9 @@ class NotionKanbanApp {
           <div class="progress-fill ${percent === 100 ? 'complete' : ''}" style="width: ${percent}%;"></div>
         </div>
       </div>
+    ` : '';
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-        <div class="form-group">
-          <label>Etapa Principal</label>
-          <select id="detail-task-stage" class="form-control">
-            ${stageOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Prioridad Socio</label>
-          <select id="detail-task-priority" class="form-control">
-            <option value="0" ${task.priority === '0' ? 'selected' : ''}>Normal ⭐</option>
-            <option value="1" ${task.priority === '1' ? 'selected' : ''}>Alta ⭐⭐</option>
-            <option value="2" ${task.priority === '2' ? 'selected' : ''}>Urgente Socio 🚨</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Fecha Límite</label>
-          <input type="date" id="detail-task-deadline" class="form-control" value="${task.date_deadline || ''}" />
-        </div>
-      </div>
-
+    const partnerHtml = sectionVisible('partner') ? `
       <div class="form-group">
         <label>Socio Responsable</label>
         <div style="display: flex; gap: 12px; margin-top: 4px;">
@@ -1715,7 +1707,9 @@ class NotionKanbanApp {
           <label style="cursor: pointer; font-size: 13px;"><input type="checkbox" id="chk-regina" ${isRegina ? 'checked' : ''} /> 👩‍💼 Regina</label>
         </div>
       </div>
+    ` : '';
 
+    const tagsSectionHtml = sectionVisible('tags') ? `
       <!-- Editable Tags Management -->
       <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -1726,13 +1720,15 @@ class NotionKanbanApp {
           ${tagsHtml}
         </div>
       </div>
+    ` : '';
 
+    const coverSectionHtml = sectionVisible('cover') ? `
       <div class="form-group" style="margin-top: 10px; background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
         <label style="display: flex; align-items: center; justify-content: space-between;">
           <span>🖼️ Imagen de Portada</span>
           ${hasCover ? `<span style="font-size: 11px; color: #10b981;">✓ Portada Activa</span>` : ''}
         </label>
-        
+
         <div class="cover-dropzone" id="cover-dropzone">
           <input type="file" id="cover-file-input" style="display:none;" accept="image/*" />
           <div style="font-size: 13px; font-weight: 500; color: var(--text-main);">
@@ -1749,13 +1745,15 @@ class NotionKanbanApp {
           <input type="url" id="detail-task-cover" class="form-control" value="${esc(task.cover_image)}" placeholder="O pega un enlace directo URL (https://...)" style="font-size: 12px;" />
         </div>
       </div>
+    ` : '';
 
+    const subKanbanSectionHtml = sectionVisible('subkanban') ? `
       <div class="sub-kanban-container">
         <div class="sub-kanban-title">
           <span>📊 Sub-Kanban de Hitos / Subtareas</span>
           <span style="font-weight:normal; font-size:11px;">🖐️ Arrastra las tarjetas entre columnas</span>
         </div>
-        
+
         <div class="sub-kanban-board">
           <div class="sub-kanban-col" data-sub-col="todo">
             <div class="sub-kanban-col-header">
@@ -1787,7 +1785,9 @@ class NotionKanbanApp {
           <button id="add-sub-card-btn" class="btn btn-sm btn-primary">Añadir</button>
         </div>
       </div>
+    ` : '';
 
+    const attachmentsSectionHtml = sectionVisible('attachments') ? `
       <div class="form-group" style="margin-top: 10px;">
         <label>📎 Archivos & Imágenes Adjuntas</label>
         <div class="upload-dropzone" id="file-dropzone">
@@ -1804,11 +1804,13 @@ class NotionKanbanApp {
           ${renderAttachments}
         </div>
       </div>
+    ` : '';
 
+    const blocksSectionHtml = sectionVisible('blocks') ? `
       <!-- Notion Interactive Block Content Builder -->
       <div class="notion-block-container">
         <div class="sub-kanban-title" style="margin-bottom: 4px;">
-          <span>🧩 Bloques de Contenido Estilo Notion</span>
+          <span>🧩 Bloques de Contenido</span>
           <span style="font-weight:normal; font-size:11px;">Agrega notas, cuadrículas, carruseles y alertas</span>
         </div>
 
@@ -1823,11 +1825,67 @@ class NotionKanbanApp {
           ${renderTaskBlocks(task.blocks)}
         </div>
       </div>
+    ` : '';
 
+    const descriptionSectionHtml = sectionVisible('description') ? `
       <div class="form-group" style="margin-top:10px;">
         <label>Contenido / Minuta de la Bitácora</label>
         <textarea id="detail-task-desc" class="form-control" rows="5" style="resize: vertical; font-family: monospace; font-size: 12px;">${esc(task.description)}</textarea>
       </div>
+    ` : '';
+
+    this.detailModalBodyEl.innerHTML = `
+      ${coverBannerHtml}
+
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <div class="form-group" style="width: 70px;">
+          <label>Icono</label>
+          <input type="text" id="detail-task-icon" class="form-control" value="${esc(task.icon || '📄')}" style="text-align: center; font-size: 18px;" />
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label>Título de la Tarea / Proyecto</label>
+          <input type="text" id="detail-task-name" class="form-control" value="${esc(task.name)}" style="font-size: 16px; font-weight: 600;" />
+        </div>
+      </div>
+
+      <!-- Emoji Presets bar -->
+      <div style="display:flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; align-items:center;">
+        <span style="font-size:11px; color:var(--text-muted);">Iconos rápidos:</span>
+        ${emojiPresetsHtml}
+      </div>
+
+      ${sectionToggleBarHtml}
+
+      ${progressHtml}
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label>Etapa Principal</label>
+          <select id="detail-task-stage" class="form-control">
+            ${stageOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prioridad Socio</label>
+          <select id="detail-task-priority" class="form-control">
+            <option value="0" ${task.priority === '0' ? 'selected' : ''}>Normal ⭐</option>
+            <option value="1" ${task.priority === '1' ? 'selected' : ''}>Alta ⭐⭐</option>
+            <option value="2" ${task.priority === '2' ? 'selected' : ''}>Urgente Socio 🚨</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha Límite</label>
+          <input type="date" id="detail-task-deadline" class="form-control" value="${task.date_deadline || ''}" />
+        </div>
+      </div>
+
+      ${partnerHtml}
+      ${tagsSectionHtml}
+      ${coverSectionHtml}
+      ${subKanbanSectionHtml}
+      ${attachmentsSectionHtml}
+      ${blocksSectionHtml}
+      ${descriptionSectionHtml}
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
         <button id="delete-task-btn" class="btn btn-danger">🗑️ Eliminar Tarea</button>
@@ -1840,6 +1898,20 @@ class NotionKanbanApp {
       btn.addEventListener('click', (e) => {
         const emoji = e.target.dataset.emoji;
         document.getElementById('detail-task-icon').value = emoji;
+      });
+    });
+
+    // Section Toggle Chips — muestran u ocultan una sección del modal. Nunca
+    // borran los datos de esa sección, solo su presentación.
+    this.detailModalBodyEl.querySelectorAll('.section-toggle-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const key = chip.dataset.section;
+        this.refreshDetailModal(task, () => {
+          if (!Array.isArray(task.hiddenSections)) task.hiddenSections = [];
+          const idx = task.hiddenSections.indexOf(key);
+          if (idx === -1) task.hiddenSections.push(key);
+          else task.hiddenSections.splice(idx, 1);
+        });
       });
     });
 

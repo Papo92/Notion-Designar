@@ -265,3 +265,15 @@ funcionales pedidas tras revisar que el panel "se veía básico".
   5. La tabla principal (`.notion-table`, vista "Tabla / Notion DB") ya desplazaba correctamente en su propio contenedor; se le añadió `min-width: 760px` como refuerzo para que las columnas no se compriman a un ancho ilegible antes de activar el scroll.
 - **Verificación**: repetido 16 veces (4 anchos × 4 intentos) contra un servidor real en Chromium/Edge sin una sola falla, más confirmación visual de que desplazar la tabla dentro de su bloque no mueve el resto del modal.
 - **Prevención**: un `<input>` dentro de una `<td>` no hereda el `flex:1`/`align-items:stretch` que sí aplica a un input dentro de un contenedor flex — necesita su propio `width:100%` explícito. Ante cualquier tabla con inputs por celda, usar `table-layout:fixed` en vez de confiar en el reparto automático de columnas del navegador.
+
+---
+
+# ✨ MEJORAS (continuación)
+
+## 🚀 v5.6.0 — Secciones Opcionales en el Modal de Tarea
+
+- **Secciones que se pueden mostrar u ocultar por tarea**: Progreso, Socio Responsable, Etiquetas, Portada, Sub-Kanban, Adjuntos, Bloques de Contenido y Minuta se controlan ahora con una barra de píldoras ("Secciones") justo debajo del título. Un clic apaga la sección (la píldora queda punteada y tenue); otro clic la reactiva. Icono/Título y Etapa/Prioridad/Fecha se quedan siempre visibles por ser el mínimo indispensable para que la tarea exista y funcione en el Kanban.
+- **Ocultar nunca borra datos**: apagar "Etiquetas" no vacía `tag_ids`, apagar "Sub-Kanban" no borra las subtareas. Solo se deja de mostrar esa sección en el modal, igual que colapsar una propiedad en Notion; al reactivarla, el contenido sigue ahí. Verificado explícitamente: `captureDetailForm()` ya solo lee los campos de las secciones presentes en el DOM (sus guardas `if (el)` existentes cubrían este caso sin cambios adicionales), así que ocultar una sección no interfiere con el guardado del resto de campos.
+- **La preferencia se guarda por tarea** en `task.hiddenSections` y persiste junto con el resto de la tarea; las tareas creadas antes de este cambio (sin ese campo) muestran todas las secciones por defecto.
+- Se quitó "Estilo Notion" del encabezado del constructor de bloques — queda "🧩 Bloques de Contenido".
+- **Hallazgo aparte, no corregido**: al probar esto se encontró que `captureDetailForm()` (v5.3.0) renombra la etiqueta de una tarea al nombre *vigente* en el catálogo global (`getAvailableTags()`) cada vez que el modal se refresca por cualquier motivo — no es exclusivo de esta función. La causa es que `mockData.js` tiene la etiqueta `id:1` sembrada con dos nombres distintos según la tarea (`"🤝 Ventas Mayoreo"` en unas, `"🤝 Ventas VIP"` en otras, que es además el nombre del catálogo por defecto en `app.js`). No se tocó `mockData.js` por ser un problema de datos de ejemplo ajeno a lo pedido; queda anotado por si se quiere unificar.
