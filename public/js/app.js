@@ -1577,7 +1577,7 @@ class NotionKanbanApp {
           return `
             <div class="notion-block-card" data-block-id="${blk.id}">
               <div class="notion-block-header">
-                <span>📊 Cuadrícula / Tabla Estilo Notion</span>
+                <span>📊 Cuadrícula / Tabla</span>
                 <div>
                   <button type="button" class="move-block-up icon-btn-subtle" data-idx="${idx}">▲</button>
                   <button type="button" class="move-block-down icon-btn-subtle" data-idx="${idx}">▼</button>
